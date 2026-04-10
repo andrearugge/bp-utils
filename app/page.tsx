@@ -55,6 +55,8 @@ export default function Home() {
     filename: string;
   } | null>(null);
   const abortRef = useRef(false);
+  // Stores File objects from last batch that errored — enables retry without re-upload
+  const [retryFiles, setRetryFiles] = useState<Map<string, File>>(new Map());
 
   // Load from localStorage on mount, pick initial tab
   useEffect(() => {
@@ -77,12 +79,66 @@ export default function Home() {
     setActiveTab("upload");
   }
 
+  async function extractFile(file: File): Promise<InvoiceRecord> {
+    const base64 = await toBase64(file);
+    const mediaType = getMediaType(file);
+    const isPdf = mediaType === "application/pdf";
+
+    const res = await fetch("/api/extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base64, mediaType, isPdf }),
+    });
+
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
+
+    return {
+      id: uid(),
+      data: data.data ?? "N/D",
+      fornitore: data.fornitore ?? "N/D",
+      descrizione: data.descrizione ?? "N/D",
+      imponibile: data.imponibile ?? "0.00",
+      valuta: data.valuta ?? "EUR",
+      numero_fattura: data.numero_fattura ?? "N/D",
+      paese: data.paese ?? "N/D",
+      area: data.area ?? "EXTRA-UE",
+      tasso_cambio: data.tasso_cambio ?? null,
+      imponibile_eur: data.imponibile_eur ?? null,
+      file: file.name,
+      extracted_at: nowItalian(),
+      status: "ok",
+    };
+  }
+
+  function makeErrorRecord(file: File, err: unknown): InvoiceRecord {
+    return {
+      id: uid(),
+      data: "N/D",
+      fornitore: "N/D",
+      descrizione: "N/D",
+      imponibile: "0.00",
+      valuta: "EUR",
+      numero_fattura: "N/D",
+      paese: "N/D",
+      area: "EXTRA-UE",
+      tasso_cambio: null,
+      imponibile_eur: null,
+      file: file.name,
+      extracted_at: nowItalian(),
+      status: "error",
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
   async function handleExtract(files: File[]) {
     abortRef.current = false;
     setIsProcessing(true);
     setProgress({ current: 0, total: files.length, filename: "" });
+    setRetryFiles(new Map()); // clear previous retry state on new batch
 
     let current = records; // local copy to accumulate during the loop
+    const newRetryFiles = new Map<string, File>();
 
     for (let i = 0; i < files.length; i++) {
       if (abortRef.current) break;
@@ -91,70 +147,63 @@ export default function Home() {
       setProgress({ current: i + 1, total: files.length, filename: file.name });
 
       let record: InvoiceRecord;
-
       try {
-        const base64 = await toBase64(file);
-        const mediaType = getMediaType(file);
-        const isPdf = mediaType === "application/pdf";
-
-        const res = await fetch("/api/extract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ base64, mediaType, isPdf }),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok || data.error) {
-          throw new Error(data.error ?? `HTTP ${res.status}`);
-        }
-
-        record = {
-          id: uid(),
-          data: data.data ?? "N/D",
-          fornitore: data.fornitore ?? "N/D",
-          descrizione: data.descrizione ?? "N/D",
-          imponibile: data.imponibile ?? "0.00",
-          valuta: data.valuta ?? "EUR",
-          numero_fattura: data.numero_fattura ?? "N/D",
-          paese: data.paese ?? "N/D",
-          area: data.area ?? "EXTRA-UE",
-          tasso_cambio: data.tasso_cambio ?? null,
-          imponibile_eur: data.imponibile_eur ?? null,
-          file: file.name,
-          extracted_at: nowItalian(),
-          status: "ok",
-        };
+        record = await extractFile(file);
       } catch (err) {
-        record = {
-          id: uid(),
-          data: "N/D",
-          fornitore: "N/D",
-          descrizione: "N/D",
-          imponibile: "0.00",
-          valuta: "EUR",
-          numero_fattura: "N/D",
-          paese: "N/D",
-          area: "EXTRA-UE",
-          tasso_cambio: null,
-          imponibile_eur: null,
-          file: file.name,
-          extracted_at: nowItalian(),
-          status: "error",
-          error: err instanceof Error ? err.message : String(err),
-        };
+        record = makeErrorRecord(file, err);
+        newRetryFiles.set(file.name, file);
       }
 
-      // Save immediately after each file
       current = [...current, record];
       setRecords(current);
       saveRecords(current);
     }
 
+    setRetryFiles(newRetryFiles);
     setIsProcessing(false);
     setProgress(null);
     abortRef.current = false;
     setActiveTab("archive");
+  }
+
+  async function handleRetryErrors() {
+    const errorRecords = records.filter(
+      (r) => r.status === "error" && retryFiles.has(r.file)
+    );
+    if (errorRecords.length === 0) return;
+
+    abortRef.current = false;
+    setIsProcessing(true);
+    setProgress({ current: 0, total: errorRecords.length, filename: "" });
+
+    const newRetryFiles = new Map(retryFiles);
+
+    for (let i = 0; i < errorRecords.length; i++) {
+      if (abortRef.current) break;
+
+      const errorRec = errorRecords[i];
+      const file = retryFiles.get(errorRec.file)!;
+      setProgress({ current: i + 1, total: errorRecords.length, filename: file.name });
+
+      let newRecord: InvoiceRecord;
+      try {
+        newRecord = { ...(await extractFile(file)), id: errorRec.id };
+        newRetryFiles.delete(file.name); // success: remove from retry pool
+      } catch (err) {
+        newRecord = { ...makeErrorRecord(file, err), id: errorRec.id };
+      }
+
+      setRecords((prev) => {
+        const next = prev.map((r) => (r.id === errorRec.id ? newRecord : r));
+        saveRecords(next);
+        return next;
+      });
+    }
+
+    setRetryFiles(newRetryFiles);
+    setIsProcessing(false);
+    setProgress(null);
+    abortRef.current = false;
   }
 
   function handleAbort() {
@@ -238,6 +287,11 @@ export default function Home() {
               onDelete={handleDelete}
               onClear={handleClear}
               onAddMore={() => setActiveTab("upload")}
+              onRetryErrors={handleRetryErrors}
+              retryableErrorCount={
+                records.filter((r) => r.status === "error" && retryFiles.has(r.file)).length
+              }
+              isProcessing={isProcessing}
             />
           </TabsContent>
         </Tabs>

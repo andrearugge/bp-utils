@@ -39,35 +39,53 @@ export async function POST(request: NextRequest) {
         },
       };
 
+  const anthropicBody = JSON.stringify({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 1000,
+    messages: [
+      {
+        role: "user",
+        content: [
+          contentBlock,
+          {
+            type: "text",
+            text: EXTRACTION_PROMPT,
+          },
+        ],
+      },
+    ],
+  });
+
+  const anthropicHeaders = {
+    "x-api-key": apiKey,
+    "anthropic-version": "2023-06-01",
+    "anthropic-beta": "pdfs-2024-09-25",
+    "Content-Type": "application/json",
+  };
+
   let anthropicResponse: Response;
   try {
     anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-beta": "pdfs-2024-09-25",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        messages: [
-          {
-            role: "user",
-            content: [
-              contentBlock,
-              {
-                type: "text",
-                text: EXTRACTION_PROMPT,
-              },
-            ],
-          },
-        ],
-      }),
+      headers: anthropicHeaders,
+      body: anthropicBody,
     });
   } catch (err) {
     return NextResponse.json({ error: `Errore di rete: ${String(err)}` }, { status: 500 });
+  }
+
+  // Single retry after 3s for overloaded errors (529)
+  if (anthropicResponse.status === 529) {
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    try {
+      anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: anthropicHeaders,
+        body: anthropicBody,
+      });
+    } catch (err) {
+      return NextResponse.json({ error: `Errore di rete: ${String(err)}` }, { status: 500 });
+    }
   }
 
   if (!anthropicResponse.ok) {

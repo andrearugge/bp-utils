@@ -32,6 +32,9 @@ interface ArchiveTabProps {
   onDelete: (id: string) => void;
   onClear: () => void;
   onAddMore: () => void;
+  onRetryErrors?: () => void;
+  retryableErrorCount?: number;
+  isProcessing?: boolean;
 }
 
 const AREA_FILTERS: { label: string; value: AreaFilter }[] = [
@@ -60,7 +63,15 @@ function parseAmount(str: string): number {
   return isNaN(n) ? 0 : n;
 }
 
-export function ArchiveTab({ records, onDelete, onClear, onAddMore }: ArchiveTabProps) {
+export function ArchiveTab({
+  records,
+  onDelete,
+  onClear,
+  onAddMore,
+  onRetryErrors,
+  retryableErrorCount = 0,
+  isProcessing = false,
+}: ArchiveTabProps) {
   const [filter, setFilter] = useState<AreaFilter>("ALL");
 
   const filtered = filter === "ALL" ? records : records.filter((r) => r.area === filter);
@@ -383,6 +394,16 @@ export function ArchiveTab({ records, onDelete, onClear, onAddMore }: ArchiveTab
         </AlertDialog>
 
         <div className="flex gap-2">
+          {retryableErrorCount > 0 && onRetryErrors && (
+            <Button
+              variant="outline"
+              onClick={onRetryErrors}
+              disabled={isProcessing}
+              style={{ borderColor: "#ef4444", color: "#ef4444" }}
+            >
+              Rianalizza errori ({retryableErrorCount})
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={onAddMore}
