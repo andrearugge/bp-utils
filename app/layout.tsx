@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Navbar } from "@/components/Navbar";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -22,7 +23,10 @@ export default function RootLayout({
   return (
     <html lang="it" className={`${dmSans.variable} dark h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <TooltipProvider>{children}</TooltipProvider>
+        <TooltipProvider>
+          <Navbar />
+          {children}
+        </TooltipProvider>
       </body>
     </html>
   );
