@@ -8,6 +8,55 @@ import { ArchiveTab } from "@/components/ArchiveTab";
 import { InvoiceRecord } from "@/lib/types";
 import { loadRecords, saveRecords } from "@/lib/storage";
 
+// Tracks the last known rate limit state from Anthropic response headers
+interface RateLimitState {
+  requestsRemaining: number | null;
+  requestsReset: Date | null;
+  tokensRemaining: number | null;
+  tokensReset: Date | null;
+}
+
+const rateLimitState: RateLimitState = {
+  requestsRemaining: null,
+  requestsReset: null,
+  tokensRemaining: null,
+  tokensReset: null,
+};
+
+// Minimum remaining budget before we pause and wait for the reset window
+const REQUESTS_BUDGET_THRESHOLD = 2;
+const TOKENS_BUDGET_THRESHOLD = 5000;
+
+function updateRateLimitState(headers: Headers) {
+  const reqRemaining = headers.get("anthropic-ratelimit-requests-remaining");
+  const reqReset = headers.get("anthropic-ratelimit-requests-reset");
+  const tokRemaining = headers.get("anthropic-ratelimit-tokens-remaining");
+  const tokReset = headers.get("anthropic-ratelimit-tokens-reset");
+
+  if (reqRemaining !== null) rateLimitState.requestsRemaining = parseInt(reqRemaining, 10);
+  if (reqReset !== null) rateLimitState.requestsReset = new Date(reqReset);
+  if (tokRemaining !== null) rateLimitState.tokensRemaining = parseInt(tokRemaining, 10);
+  if (tokReset !== null) rateLimitState.tokensReset = new Date(tokReset);
+}
+
+async function waitForRateLimit() {
+  const now = Date.now();
+  let waitUntil = 0;
+
+  const { requestsRemaining, requestsReset, tokensRemaining, tokensReset } = rateLimitState;
+
+  if (requestsRemaining !== null && requestsRemaining <= REQUESTS_BUDGET_THRESHOLD && requestsReset) {
+    waitUntil = Math.max(waitUntil, requestsReset.getTime() - now + 200);
+  }
+  if (tokensRemaining !== null && tokensRemaining <= TOKENS_BUDGET_THRESHOLD && tokensReset) {
+    waitUntil = Math.max(waitUntil, tokensReset.getTime() - now + 200);
+  }
+
+  if (waitUntil > 0) {
+    await new Promise((resolve) => setTimeout(resolve, waitUntil));
+  }
+}
+
 function uid(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
@@ -80,6 +129,8 @@ export default function Home() {
   }
 
   async function extractFile(file: File): Promise<InvoiceRecord> {
+    await waitForRateLimit();
+
     const base64 = await toBase64(file);
     const mediaType = getMediaType(file);
     const isPdf = mediaType === "application/pdf";
@@ -89,6 +140,8 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ base64, mediaType, isPdf }),
     });
+
+    updateRateLimitState(res.headers);
 
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
