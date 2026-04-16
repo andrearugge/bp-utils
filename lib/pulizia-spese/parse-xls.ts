@@ -1,24 +1,35 @@
 import * as XLSX from "xlsx";
 import { SpesaRow } from "./types";
 
-// FattureInCloud export layout:
-//   rows 0-3 → metadata/empty
-//   row  4   → headers: Data(0), Fornitore(7), Descrizione(16), Imponibile(18)
-//   rows 5+  → data
+// FattureInCloud column positions (0-based, i.e. A=0, H=7, Q=16, S=18)
+const COL = {
+  DATA:        0,  // A
+  FORNITORE:   7,  // H
+  DESCRIZIONE: 16, // Q
+  IMPONIBILE:  18, // S
+} as const;
 
-const COL = { DATA: 0, FORNITORE: 7, DESCRIZIONE: 16, IMPONIBILE: 18 } as const;
+// Detect the first data row by finding the header row (contains "Data" in col A)
+// then returning the row after it.
+function findDataStartRow(ws: XLSX.WorkSheet, maxRow: number): number {
+  for (let r = 0; r <= Math.min(maxRow, 20); r++) {
+    const cell = ws[XLSX.utils.encode_cell({ r, c: COL.DATA })];
+    if (cell && String(cell.v ?? "").trim().toLowerCase() === "data") {
+      return r + 1;
+    }
+  }
+  // Fallback: assume header is at row 4, data starts at row 5
+  return 5;
+}
 
 function formatDate(cell: XLSX.CellObject | undefined): string {
   if (!cell) return "";
-  // With cellDates:true the .v value is a JS Date
   if (cell.t === "d" && cell.v instanceof Date) {
     const d = cell.v;
     const dd = String(d.getDate()).padStart(2, "0");
     const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yyyy = d.getFullYear();
-    return `${dd}/${mm}/${yyyy}`;
+    return `${dd}/${mm}/${d.getFullYear()}`;
   }
-  // Fallback: already a string
   return String(cell.v ?? "");
 }
 
@@ -44,19 +55,16 @@ export function parseXls(buffer: ArrayBuffer): ParseResult {
   if (!ws) return { rows: [], error: "Nessun foglio trovato nel file." };
 
   const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
-  const DATA_START_ROW = 5; // 0-indexed row 5 = first data row
+  const dataStart = findDataStartRow(ws, range.e.r);
 
   const rows: SpesaRow[] = [];
   let idx = 0;
 
-  for (let r = DATA_START_ROW; r <= range.e.r; r++) {
-    const getCell = (col: number) =>
-      ws[XLSX.utils.encode_cell({ r, c: col })];
+  for (let r = dataStart; r <= range.e.r; r++) {
+    const getCell = (col: number) => ws[XLSX.utils.encode_cell({ r, c: col })];
 
-    const imponibileCell = getCell(COL.IMPONIBILE);
-    const imponibileRaw = cellStr(imponibileCell);
-    // Skip empty rows
-    if (!imponibileRaw) continue;
+    const imponibileRaw = cellStr(getCell(COL.IMPONIBILE));
+    if (!imponibileRaw) continue; // skip empty rows
 
     rows.push({
       idx: idx++,
