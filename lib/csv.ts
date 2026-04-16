@@ -1,11 +1,9 @@
 import { InvoiceRecord, AreaFilter } from "./types";
 
-function toItalianDecimal(value: string): string {
-  return value.replace(".", ",");
-}
-
-function escapeField(value: string): string {
-  return `"${value.replace(/"/g, '""')}"`;
+function escape(value: string): string {
+  return value.includes(",") || value.includes('"') || value.includes("\n")
+    ? `"${value.replace(/"/g, '""')}"`
+    : value;
 }
 
 function getImponibileEur(record: InvoiceRecord): string {
@@ -13,49 +11,21 @@ function getImponibileEur(record: InvoiceRecord): string {
   return record.imponibile_eur ?? record.imponibile;
 }
 
+const BP_HEADER = ["Data", "Centro costo", "Categoria", "Type", "Direct", "Indirect", "Fornitore", "Descrizione", "Imponibile"];
+
 export function generateCsv(records: InvoiceRecord[], filter: AreaFilter): string {
   const filtered = filter === "ALL" ? records : records.filter((r) => r.area === filter);
 
-  const header = [
-    "Data",
-    "Fornitore",
-    "N. Fattura",
-    "Descrizione",
-    "Paese",
-    "Area",
-    "Imponibile Originale",
-    "Valuta",
-    "Imponibile EUR",
-    "Tasso Cambio",
-    "File",
-    "Estratto Il",
-  ]
-    .map(escapeField)
-    .join(";");
+  const header = BP_HEADER.map(escape).join(",");
 
   const rows = filtered.map((r) => {
     const imponibileEur = getImponibileEur(r);
-    const tassoCambio = r.tasso_cambio != null ? String(r.tasso_cambio) : "";
-
-    return [
-      r.data,
-      r.fornitore,
-      r.numero_fattura,
-      r.descrizione,
-      r.paese,
-      r.area,
-      toItalianDecimal(r.imponibile),
-      r.valuta,
-      toItalianDecimal(imponibileEur),
-      toItalianDecimal(tassoCambio),
-      r.file,
-      r.extracted_at,
-    ]
-      .map(escapeField)
-      .join(";");
+    return [r.data, "", "", "", "", "", r.fornitore, r.descrizione, imponibileEur]
+      .map(escape)
+      .join(",");
   });
 
-  return "\uFEFF" + [header, ...rows].join("\n");
+  return "\uFEFF" + [header, ...rows].join("\r\n");
 }
 
 export function getCsvFilename(filter: AreaFilter): string {
