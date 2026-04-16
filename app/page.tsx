@@ -33,6 +33,13 @@ const TOOLS = [
     description:
       "Unisci più file CSV in formato Business Plan in un unico file con una sola intestazione",
   },
+  {
+    href: "/formatta-fatture",
+    Icon: FileSpreadsheet,
+    title: "Formatta Fatture e Ndc",
+    description:
+      "Carica i file XLS di fatture e note di credito e genera un CSV unificato con i valori delle Ndc negativi",
+  },
 ];
 
 export default function Home() {
