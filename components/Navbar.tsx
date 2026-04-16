@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { href: "/fatture", label: "Classifica fatture" },
   { href: "/prima-nota", label: "Classifica prima nota" },
   { href: "/pulizia-spese", label: "Pulizia spese FattureInCloud" },
+  { href: "/merge-csv", label: "Merge CSV" },
 ];
 
 export function Navbar() {
