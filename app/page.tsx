@@ -40,6 +40,13 @@ const TOOLS = [
     description:
       "Carica i file XLS di fatture e note di credito e genera un CSV unificato con i valori delle Ndc negativi",
   },
+  {
+    href: "/invia-bp",
+    Icon: FileText,
+    title: "Invio dati a Business Plan",
+    description:
+      "Carica un CSV e aggiungilo in append a una tab del tuo Google Sheet con validazione delle colonne",
+  },
 ];
 
 export default function Home() {

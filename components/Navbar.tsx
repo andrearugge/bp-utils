@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: "/pulizia-spese", label: "Pulizia spese FattureInCloud" },
   { href: "/merge-csv", label: "Merge CSV" },
   { href: "/formatta-fatture", label: "Formatta Fatture e Ndc" },
+  { href: "/invia-bp", label: "Invio dati a Business Plan" },
 ];
 
 export function Navbar() {
