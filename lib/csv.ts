@@ -6,9 +6,9 @@ function escape(value: string): string {
     : value;
 }
 
-function getImponibileEur(record: InvoiceRecord): string {
-  if (record.valuta === "EUR") return record.imponibile;
-  return record.imponibile_eur ?? record.imponibile;
+function getImponibile(record: InvoiceRecord): string {
+  if (record.area === "EXTRA-UE") return record.imponibile_eur ?? record.imponibile;
+  return record.imponibile;
 }
 
 const BP_HEADER = ["Data", "Centro costo", "Categoria", "Type", "Direct", "Indirect", "Fornitore", "Descrizione", "Imponibile"];
@@ -19,8 +19,8 @@ export function generateCsv(records: InvoiceRecord[], filter: AreaFilter): strin
   const header = BP_HEADER.map(escape).join(",");
 
   const rows = filtered.map((r) => {
-    const imponibileEur = getImponibileEur(r);
-    return [r.data, "", "", "", "", "", r.fornitore, r.descrizione, imponibileEur]
+    const imponibile = getImponibile(r);
+    return [r.data, "", "", "", "", "", r.fornitore, r.descrizione, imponibile]
       .map(escape)
       .join(",");
   });
