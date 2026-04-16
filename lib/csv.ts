@@ -7,8 +7,8 @@ function escape(value: string): string {
 }
 
 function getImponibile(record: InvoiceRecord): string {
-  if (record.area === "EXTRA-UE") return record.imponibile_eur ?? record.imponibile;
-  return record.imponibile;
+  if (record.valuta === "EUR") return record.imponibile;
+  return record.imponibile_eur ?? record.imponibile;
 }
 
 const BP_HEADER = ["Data", "Centro costo", "Categoria", "Type", "Direct", "Indirect", "Fornitore", "Descrizione", "Imponibile"];
