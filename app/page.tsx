@@ -19,6 +19,20 @@ const TOOLS = [
     description:
       "Carica il CSV della prima nota dalla commercialista, classifica le voci e scarica il CSV per il Business Plan",
   },
+  {
+    href: "/pulizia-spese",
+    Icon: FileSpreadsheet,
+    title: "Pulizia spese FattureInCloud",
+    description:
+      "Carica l'export XLS di FattureInCloud e convertilo nel formato Business Plan",
+  },
+  {
+    href: "/merge-csv",
+    Icon: FileText,
+    title: "Merge CSV",
+    description:
+      "Unisci più file CSV in formato Business Plan in un unico file con una sola intestazione",
+  },
 ];
 
 export default function Home() {
