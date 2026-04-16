@@ -7,6 +7,7 @@ import { useState } from "react";
 const NAV_LINKS = [
   { href: "/fatture", label: "Classifica fatture" },
   { href: "/prima-nota", label: "Classifica prima nota" },
+  { href: "/pulizia-spese", label: "Pulizia spese FattureInCloud" },
 ];
 
 export function Navbar() {
