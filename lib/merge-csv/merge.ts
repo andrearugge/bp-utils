@@ -10,9 +10,11 @@ const EXPECTED_HEADER = [
   "Imponibile",
 ];
 
+const IMPONIBILE_COL = 8;
+
 export interface CsvFile {
   name: string;
-  rows: string[]; // raw data lines (no header)
+  rows: string[]; // normalized: ; separator, italian decimals
   rowCount: number;
 }
 
@@ -21,12 +23,57 @@ export interface ParseFileResult {
   error?: string;
 }
 
-function normalizeHeader(line: string): string[] {
-  // Strip BOM, split by comma, trim quotes and spaces
-  return line
-    .replace(/^\uFEFF/, "")
-    .split(",")
-    .map((h) => h.replace(/^"|"$/g, "").trim());
+function detectSeparator(headerLine: string): "," | ";" {
+  const stripped = headerLine.replace(/^\uFEFF/, "");
+  const semiCount = (stripped.match(/;/g) ?? []).length;
+  // Header has 8 separators when well-formed (9 columns)
+  return semiCount >= 8 ? ";" : ",";
+}
+
+function parseCsvLine(line: string, sep: string): string[] {
+  const fields: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        cur += c;
+      }
+    } else {
+      if (c === '"') {
+        inQuotes = true;
+      } else if (c === sep) {
+        fields.push(cur);
+        cur = "";
+      } else {
+        cur += c;
+      }
+    }
+  }
+  fields.push(cur);
+  return fields;
+}
+
+function escape(v: string): string {
+  return v.includes(";") || v.includes('"') || v.includes("\n")
+    ? `"${v.replace(/"/g, '""')}"`
+    : v;
+}
+
+function normalizeLegacyRow(rawLine: string): string {
+  const fields = parseCsvLine(rawLine, ",");
+  if (fields[IMPONIBILE_COL] !== undefined) {
+    fields[IMPONIBILE_COL] = fields[IMPONIBILE_COL].replace(".", ",");
+  }
+  return fields.map(escape).join(";");
 }
 
 export function parseCsvFile(name: string, text: string): ParseFileResult {
@@ -35,7 +82,11 @@ export function parseCsvFile(name: string, text: string): ParseFileResult {
 
   if (nonEmpty.length === 0) return { error: "File vuoto." };
 
-  const header = normalizeHeader(nonEmpty[0]);
+  const sep = detectSeparator(nonEmpty[0]);
+  const header = nonEmpty[0]
+    .replace(/^\uFEFF/, "")
+    .split(sep)
+    .map((h) => h.replace(/^"|"$/g, "").trim());
   const mismatch = EXPECTED_HEADER.find((col, i) => header[i] !== col);
 
   if (header.length !== EXPECTED_HEADER.length || mismatch) {
@@ -44,12 +95,13 @@ export function parseCsvFile(name: string, text: string): ParseFileResult {
     };
   }
 
-  const rows = nonEmpty.slice(1);
+  const rawRows = nonEmpty.slice(1);
+  const rows = sep === ";" ? rawRows : rawRows.map(normalizeLegacyRow);
   return { file: { name, rows, rowCount: rows.length } };
 }
 
 export function mergeCsvFiles(files: CsvFile[]): string {
-  const header = EXPECTED_HEADER.join(",");
+  const header = EXPECTED_HEADER.join(";");
   const allRows = files.flatMap((f) => f.rows);
   return "\uFEFF" + [header, ...allRows].join("\r\n");
 }

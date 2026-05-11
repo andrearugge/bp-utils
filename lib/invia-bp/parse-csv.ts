@@ -3,7 +3,7 @@ export interface ParsedCsv {
   rows: string[][];
 }
 
-function parseLine(line: string): string[] {
+function parseLine(line: string, sep: string): string[] {
   const result: string[] = [];
   let current = "";
   let inQuotes = false;
@@ -13,7 +13,7 @@ function parseLine(line: string): string[] {
     if (ch === '"') {
       if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
       else inQuotes = !inQuotes;
-    } else if (ch === "," && !inQuotes) {
+    } else if (ch === sep && !inQuotes) {
       result.push(current); current = "";
     } else {
       current += ch;
@@ -21,6 +21,12 @@ function parseLine(line: string): string[] {
   }
   result.push(current);
   return result;
+}
+
+function detectSeparator(headerLine: string): "," | ";" {
+  const semiCount = (headerLine.match(/;/g) ?? []).length;
+  const commaCount = (headerLine.match(/,/g) ?? []).length;
+  return semiCount >= commaCount && semiCount > 0 ? ";" : ",";
 }
 
 export function parseCsv(text: string): ParsedCsv | { error: string } {
@@ -33,8 +39,9 @@ export function parseCsv(text: string): ParsedCsv | { error: string } {
 
   if (lines.length < 2) return { error: "Il file è vuoto o ha solo l'intestazione." };
 
-  const headers = parseLine(lines[0]);
-  const rows = lines.slice(1).map(parseLine);
+  const sep = detectSeparator(lines[0]);
+  const headers = parseLine(lines[0], sep);
+  const rows = lines.slice(1).map((l) => parseLine(l, sep));
 
   return { headers, rows };
 }

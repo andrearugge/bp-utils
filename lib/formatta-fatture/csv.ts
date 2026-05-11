@@ -6,18 +6,26 @@ const HEADER = [
 ];
 
 function escape(v: string): string {
-  return v.includes(",") || v.includes('"') || v.includes("\n")
+  return v.includes(";") || v.includes('"') || v.includes("\n")
     ? `"${v.replace(/"/g, '""')}"`
     : v;
 }
 
+function toItalianDecimal(v: string): string {
+  return v.replace(".", ",");
+}
+
 export function generateCsv(rows: FatturaRow[]): string {
-  const header = HEADER.map(escape).join(",");
+  const header = HEADER.map(escape).join(";");
   const lines = rows.map((r) =>
     [
       r.data, r.doc, r.num, r.cliente, r.codice, r.nome,
-      r.imponibile, r.nonImponibile, r.iva, r.aliquotaIva, r.codiceIva,
-    ].map(escape).join(",")
+      toItalianDecimal(r.imponibile),
+      toItalianDecimal(r.nonImponibile),
+      toItalianDecimal(r.iva),
+      toItalianDecimal(r.aliquotaIva),
+      r.codiceIva,
+    ].map(escape).join(";")
   );
   return "\uFEFF" + [header, ...lines].join("\r\n");
 }

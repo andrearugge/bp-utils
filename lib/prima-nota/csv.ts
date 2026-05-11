@@ -5,22 +5,21 @@ const BP_HEADER = ["Data", "Centro costo", "Categoria", "Type", "Direct", "Indir
 
 export function generatePrimaNotaCsv(rows: PrimaNotaRow[], soloInserisci: boolean): string {
   const filtered = soloInserisci ? rows.filter(r => r.azione === "Inserisci") : rows;
-  // Separatore: virgola (NON punto e virgola come le fatture)
-  // BOM UTF-8 per compatibilità Excel
   const escape = (v: string) => {
-    return v.includes(",") || v.includes('"') || v.includes("\n")
+    return v.includes(";") || v.includes('"') || v.includes("\n")
       ? `"${v.replace(/"/g, '""')}"`
       : v;
   };
+  const toItalianDecimal = (v: string) => v.replace(".", ",");
   const header = [
     ...BP_HEADER,
     ...(soloInserisci ? [] : ["Azione"]),
-  ].map(escape).join(",");
+  ].map(escape).join(";");
   const lines = filtered.map(r =>
     [
-      r.data, "", "", "", "", "", r.fornitore, r.descrizione, r.importo,
+      r.data, "", "", "", "", "", r.fornitore, r.descrizione, toItalianDecimal(r.importo),
       ...(soloInserisci ? [] : [r.azione]),
-    ].map(escape).join(",")
+    ].map(escape).join(";")
   );
   return "\uFEFF" + [header, ...lines].join("\r\n");
 }
