@@ -3,17 +3,21 @@ import { SpesaRow } from "./types";
 const BP_HEADER = ["Data", "Centro costo", "Categoria", "Type", "Direct", "Indirect", "Fornitore", "Descrizione", "Imponibile"];
 
 function escape(value: string): string {
-  return value.includes(",") || value.includes('"') || value.includes("\n")
+  return value.includes(";") || value.includes('"') || value.includes("\n")
     ? `"${value.replace(/"/g, '""')}"`
     : value;
 }
 
+function toItalianDecimal(value: string): string {
+  return value.replace(".", ",");
+}
+
 export function generateSpeseCsv(rows: SpesaRow[]): string {
-  const header = BP_HEADER.map(escape).join(",");
+  const header = BP_HEADER.map(escape).join(";");
   const lines = rows.map((r) =>
-    [r.data, "", "", "", "", "", r.fornitore, r.descrizione, r.imponibile]
+    [r.data, "", "", "", "", "", r.fornitore, r.descrizione, toItalianDecimal(r.imponibile)]
       .map(escape)
-      .join(",")
+      .join(";")
   );
   return "\uFEFF" + [header, ...lines].join("\r\n");
 }

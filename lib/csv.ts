@@ -1,9 +1,13 @@
 import { InvoiceRecord, AreaFilter } from "./types";
 
 function escape(value: string): string {
-  return value.includes(",") || value.includes('"') || value.includes("\n")
+  return value.includes(";") || value.includes('"') || value.includes("\n")
     ? `"${value.replace(/"/g, '""')}"`
     : value;
+}
+
+function toItalianDecimal(value: string): string {
+  return value.replace(".", ",");
 }
 
 function getImponibile(record: InvoiceRecord): string {
@@ -16,13 +20,13 @@ const BP_HEADER = ["Data", "Centro costo", "Categoria", "Type", "Direct", "Indir
 export function generateCsv(records: InvoiceRecord[], filter: AreaFilter): string {
   const filtered = filter === "ALL" ? records : records.filter((r) => r.area === filter);
 
-  const header = BP_HEADER.map(escape).join(",");
+  const header = BP_HEADER.map(escape).join(";");
 
   const rows = filtered.map((r) => {
-    const imponibile = getImponibile(r);
+    const imponibile = toItalianDecimal(getImponibile(r));
     return [r.data, "", "", "", "", "", r.fornitore, r.descrizione, imponibile]
       .map(escape)
-      .join(",");
+      .join(";");
   });
 
   return "\uFEFF" + [header, ...rows].join("\r\n");
