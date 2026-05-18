@@ -147,10 +147,25 @@ export default function InviaBpPage() {
     try {
       const sheetHeaders = await getTabHeaders(token, sheetId.trim(), tabName.trim());
 
-      // Validate columns
       const csvHeaders = csv.headers;
-      const mismatch = csvHeaders.some((h, i) => h !== sheetHeaders[i]) ||
-                       csvHeaders.length !== sheetHeaders.length;
+      let rowsToSend = csv.rows;
+      let effectiveSheetHeaders = sheetHeaders;
+
+      // If "Note Admin" is in the sheet but not in the CSV, pad rows with an empty value
+      const NOTE_ADMIN = "Note Admin";
+      const noteAdminIdx = sheetHeaders.indexOf(NOTE_ADMIN);
+      if (noteAdminIdx !== -1 && !csvHeaders.includes(NOTE_ADMIN)) {
+        effectiveSheetHeaders = sheetHeaders.filter((_, i) => i !== noteAdminIdx);
+        rowsToSend = csv.rows.map((row) => {
+          const r = [...row];
+          r.splice(noteAdminIdx, 0, "");
+          return r;
+        });
+      }
+
+      // Validate columns
+      const mismatch = csvHeaders.some((h, i) => h !== effectiveSheetHeaders[i]) ||
+                       csvHeaders.length !== effectiveSheetHeaders.length;
 
       if (mismatch) {
         const detail = `CSV: [${csvHeaders.join(", ")}] — Sheet: [${sheetHeaders.join(", ")}]`;
@@ -159,7 +174,7 @@ export default function InviaBpPage() {
         return;
       }
 
-      const inserted = await appendRows(token, sheetId.trim(), tabName.trim(), csv.rows);
+      const inserted = await appendRows(token, sheetId.trim(), tabName.trim(), rowsToSend);
       setSendMsg(`${inserted} righe aggiunte con successo nella tab "${tabName}".`);
       setSendStatus("ok");
     } catch (err) {
