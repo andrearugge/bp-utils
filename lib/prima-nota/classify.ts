@@ -177,7 +177,7 @@ export function buildOutput(
     sub.includes("contributi inps") || sub.includes("constributi inps");
   if (hasContributiInps) {
     // Try to extract a cognome (admin) vs generic (dipendenti)
-    const m = sottoconto.match(/c[o]?ntributi inps\s+(\S+)/i);
+    const m = sottoconto.match(/c[o]?n[s]?tributi inps\s+(\S+)/i);
     const afterKeyword = m ? m[1].toLowerCase() : "";
     const isAdmin =
       afterKeyword &&
@@ -202,7 +202,7 @@ export function buildOutput(
     const mese = extractMonth(rawDesc);
     return {
       fornitore: "",
-      descrizione: `Stipendio dipendente${mese ? " - " + mese : ""}`,
+      descrizione: `Stipendi dipendenti${mese ? " - " + mese : ""}`,
     };
   }
   if (sub.includes("stipendi apprendista")) {
