@@ -449,7 +449,7 @@ function QuarterCard({
           )}
           {csvFat && csvAcq && (
             <span style={{ marginLeft: "auto" }}>
-              ACT auto: <span style={{ color: "#e8e6e1", fontWeight: 600 }}>{fmt(csvFat.total - csvAcq.total)}</span>
+              EBITDA: <span style={{ color: "#e8e6e1", fontWeight: 600 }}>{fmt(csvFat.total - csvAcq.total)}</span>
             </span>
           )}
         </div>
@@ -502,8 +502,9 @@ export default function PianoIncentiviPage() {
       const ebitda   = fatTotal - acqTotal;
 
       const updates: Partial<QData> = {};
-      if (q.act === "" && ebitda !== 0)
-        updates.act = Math.round(ebitda).toString();
+      // ACT Revenue = gross revenue (fatture emesse), NOT fatture - acquisti
+      if (q.act === "" && fatTotal !== 0)
+        updates.act = Math.round(fatTotal).toString();
       if (q.actEbitdaPct === "" && fatTotal !== 0)
         updates.actEbitdaPct = ((ebitda / fatTotal) * 100).toFixed(1);
 
@@ -725,7 +726,7 @@ export default function PianoIncentiviPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr>
-                  {["", "BGT", "Soglia", "Target", "Eccellenza", "ACT", "EBITDA %", "Livello", "Mult.", "Bonus netto"].map((h, i) => (
+                  {["", "BGT", "Soglia", "Target", "Eccellenza", "EBITDA", "EBITDA %", "Livello", "Mult.", "Bonus netto"].map((h, i) => (
                     <th key={i} style={{
                       textAlign: i === 0 ? "left" : "right", padding: "8px 10px",
                       fontWeight: 500, color: "#6b6b70", borderBottom: "1px solid #1a1a1e", whiteSpace: "nowrap",
