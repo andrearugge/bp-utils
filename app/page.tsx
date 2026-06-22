@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { FileText, FileSpreadsheet, Lock } from "lucide-react";
+import { FileText, FileSpreadsheet, TrendingUp } from "lucide-react";
 import { PinModal } from "@/components/PinModal";
 
 const ADMIN_STORAGE_KEY = "bp-admin-unlocked";
@@ -54,11 +54,10 @@ const TOOLS = [
 
 const ADMIN_TOOLS = [
   {
-    href: "#",
-    Icon: Lock,
-    title: "Strumento Admin",
-    description: "Placeholder — sostituisci con il primo strumento admin.",
-    admin: true,
+    href: "/admin/piano-incentivi",
+    Icon: TrendingUp,
+    title: "Piano Incentivi",
+    description: "Calcola il piano incentivo per i soci basato su fatturato e EBITDA trimestrale.",
   },
 ];
 
