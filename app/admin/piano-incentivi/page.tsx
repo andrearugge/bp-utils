@@ -483,10 +483,17 @@ export default function PianoIncentiviPage() {
 
   function autoFillAct(acq: GlobalCSVData, fat: GlobalCSVData) {
     setQuarters(prev => prev.map((q, i) => {
-      if (q.act !== "") return q; // keep manual entries
-      const computed = fat.perQuarter[i].total - acq.perQuarter[i].total;
-      if (computed === 0) return q;
-      return { ...q, act: Math.round(computed).toString() };
+      const fatTotal = fat.perQuarter[i].total;
+      const acqTotal = acq.perQuarter[i].total;
+      const ebitda   = fatTotal - acqTotal;
+
+      const updates: Partial<QData> = {};
+      if (q.act === "" && ebitda !== 0)
+        updates.act = Math.round(ebitda).toString();
+      if (q.actEbitdaPct === "" && fatTotal !== 0)
+        updates.actEbitdaPct = ((ebitda / fatTotal) * 100).toFixed(1);
+
+      return Object.keys(updates).length ? { ...q, ...updates } : q;
     }));
   }
 
