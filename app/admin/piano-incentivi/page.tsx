@@ -471,13 +471,13 @@ export default function PianoIncentiviPage() {
   // ── config state ──────────────────────────────────────────────────────────
   const [s1, setS1] = useState(90);
   const [s2, setS2] = useState(100);
-  const [s3, setS3] = useState(110);
+  const [s3, setS3] = useState(120);
   const [b1, setB1] = useState(2500);
   const [b2, setB2] = useState(5000);
   const [b3, setB3] = useState(8000);
-  const [m1, setM1] = useState("0.75");
+  const [m1, setM1] = useState("0.5");
   const [m2, setM2] = useState("1.00");
-  const [m3, setM3] = useState("1.25");
+  const [m3, setM3] = useState("1.5");
   const [ebitdaHigh, setEbitdaHigh] = useState("30");
 
   // ── quarter state ─────────────────────────────────────────────────────────
