@@ -9,15 +9,29 @@ function parseAmount(raw: string): number {
   if (!raw) return 0;
   const isNeg = raw.includes("-");
   const cleaned = raw.replace(/[^\d,.]/g, "");
+  if (!cleaned) return 0;
+
   const lastComma = cleaned.lastIndexOf(",");
-  let val: number;
+
   if (lastComma !== -1) {
+    // Standard Italian format: "1.948,05" → comma is decimal, dots are thousands
     const intPart = cleaned.slice(0, lastComma).replace(/\./g, "");
     const decPart = cleaned.slice(lastComma + 1);
-    val = parseFloat(`${intPart || "0"}.${decPart}`) || 0;
-  } else {
-    val = parseFloat(cleaned.replace(/\./g, "")) || 0;
+    const val = parseFloat(`${intPart || "0"}.${decPart}`) || 0;
+    return isNeg ? -val : val;
   }
+
+  const dotCount = (cleaned.match(/\./g) ?? []).length;
+
+  if (dotCount <= 1) {
+    // Plain integer or single-dot decimal: "1500" or "1948.05"
+    return isNeg ? -(parseFloat(cleaned) || 0) : (parseFloat(cleaned) || 0);
+  }
+
+  // Anomalous multi-dot format (e.g. "2712.07.00", "1948.05.00"):
+  // treat the FIRST dot as the decimal separator and ignore everything after.
+  const firstDot = cleaned.indexOf(".");
+  const val = parseFloat(cleaned.slice(0, firstDot + 3)) || 0; // "XXXX.YY"
   return isNeg ? -val : val;
 }
 
