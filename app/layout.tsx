@@ -10,9 +10,36 @@ const dmSans = DM_Sans({
   variable: "--font-sans",
 });
 
+const title = "Conversione Fatture";
+const description =
+  "Estrai dati da fatture estere e genera CSV per la contabilità";
+
 export const metadata: Metadata = {
-  title: "Conversione Fatture",
-  description: "Estrai dati da fatture estere e genera CSV per la contabilità",
+  title,
+  description,
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+      "max-video-preview": 0,
+      "max-image-preview": "none",
+      "max-snippet": 0,
+    },
+  },
+  openGraph: {
+    title,
+    description,
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title,
+    description,
+  },
 };
 
 export default function RootLayout({
