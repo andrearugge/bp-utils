@@ -103,17 +103,17 @@ Vincoli fissi:
 
 - [x] **5.1** `app/classifica-acquisti/page.tsx` — scaffold: auth Google + caricamento tab
       (riuso pattern step di `invia-bp`), stato in memoria
-- [ ] **5.2** Vista "Da classificare": righe non taggate con suggerimento, confidence, metodo
+- [~] **5.2** Vista "Da classificare": righe non taggate con suggerimento, confidence, metodo
       ed evidenza (match storico usato / regola / LLM); azioni accetta / modifica / scarta,
       selezione multipla per accettazione in blocco delle confidence alte
 - [ ] **5.3** Scrittura conferme: celle dei 4 assi + `Tag Source = auto` (accettato senza
       modifica) o `confirmed` (rivisto/modificato) + riga nel Classifier Log — in un unico
       batch per riga
-- [ ] **5.4** Vista "Anomalie": output Fase 4 su righe già taggate, con azioni
+- [~] **5.4** Vista "Anomalie": output Fase 4 su righe già taggate, con azioni
       correggi / ignora (ignora → loggato per non riproporre)
-- [ ] **5.5** Vista "Metriche": accuratezza LOO per asse, copertura per metodo
+- [x] **5.5** Vista "Metriche": accuratezza LOO per asse, copertura per metodo
       (esatto / fuzzy / LLM), n. righe per Tag Source
-- [ ] **5.6** Card in home (`app/page.tsx`) per il nuovo strumento
+- [x] **5.6** Card in home (`app/page.tsx`) per il nuovo strumento
 - [ ] **5.7** `npm run build` + `tsc --noEmit` puliti
 
 ---

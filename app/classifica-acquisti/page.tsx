@@ -13,6 +13,9 @@ import { AcquistoRow, isRowTaggata } from "@/lib/classifica-acquisti/types";
 import { selectGroundTruth } from "@/lib/classifica-acquisti/ground-truth";
 import { buildLookup } from "@/lib/classifica-acquisti/match";
 import { VIEWS, ViewName } from "./shared";
+import DaClassificare from "./DaClassificare";
+import AnomalieView from "./Anomalie";
+import Metriche from "./Metriche";
 
 function Btn({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
   return (
@@ -143,17 +146,26 @@ export default function ClassificaAcquistiPage() {
             </nav>
 
             <section>
-              {view === "da-classificare" && (
-                <p style={{ fontSize: 13, color: "#6b6b70" }}>
-                  Vista in arrivo (task 5.2): {daClassificare.length} righe non taggate, lookup pronto ({lookup.size} chiavi storiche).
-                </p>
+              {view === "da-classificare" && token && (
+                <DaClassificare
+                  token={token}
+                  sheetId={sheetId.trim()}
+                  tabName={tabName.trim()}
+                  tab={tab}
+                  rows={daClassificare}
+                  lookup={lookup}
+                />
               )}
-              {view === "anomalie" && (
-                <p style={{ fontSize: 13, color: "#6b6b70" }}>Vista in arrivo (task 5.4).</p>
+              {view === "anomalie" && token && (
+                <AnomalieView
+                  token={token}
+                  sheetId={sheetId.trim()}
+                  tabName={tabName.trim()}
+                  tab={tab}
+                  groundTruth={groundTruth}
+                />
               )}
-              {view === "metriche" && (
-                <p style={{ fontSize: 13, color: "#6b6b70" }}>Vista in arrivo (task 5.5).</p>
-              )}
+              {view === "metriche" && <Metriche rows={rows} groundTruth={groundTruth} />}
             </section>
           </>
         )}
