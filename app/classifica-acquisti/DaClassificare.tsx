@@ -99,6 +99,7 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
   const [suggerimenti, setSuggerimenti] = useState<Map<number, Suggerimento | null>>(new Map());
   const [coda, setCoda] = useState<Map<number, RigaClassificata>>(new Map());
   const [selezionate, setSelezionate] = useState<Set<number>>(new Set());
+  const [filtroLivello, setFiltroLivello] = useState<"tutte" | "alta" | "media" | "bassa">("tutte");
   const [editRowIndex, setEditRowIndex] = useState<number | null>(null);
   const [editValori, setEditValori] = useState<Classificazione | null>(null);
   const [llmMsg, setLlmMsg] = useState<string | null>(null);
@@ -115,9 +116,14 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
     setSuggerimenti(m);
     setCoda(new Map());
     setSelezionate(new Set());
+    setFiltroLivello("tutte");
   }, [rows, lookup]);
 
   const righeVisibili = rows.filter((r) => !coda.has(r.rowIndex));
+  const righeFiltrate =
+    filtroLivello === "tutte"
+      ? righeVisibili
+      : righeVisibili.filter((r) => suggerimenti.get(r.rowIndex)?.livello === filtroLivello);
   // Da validare via LLM: righe senza alcun match storico E righe con confidence
   // "bassa" (per definizione insufficiente per l'accettazione automatica).
   const daValidareLlm = righeVisibili.filter((r) => {
@@ -262,7 +268,10 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
     });
   }
 
-  /** Selezione veloce: aggiunge tutte le righe visibili con questo livello di confidence. */
+  /**
+   * Selezione veloce: aggiunge tutte le righe visibili con questo livello di
+   * confidence e filtra la lista per mostrare solo quelle, per una revisione pulita.
+   */
   function selezionaLivello(livello: "alta" | "media" | "bassa") {
     setSelezionate((prev) => {
       const next = new Set(prev);
@@ -271,10 +280,12 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
       }
       return next;
     });
+    setFiltroLivello(livello);
   }
 
   function deselezionaTutto() {
     setSelezionate(new Set());
+    setFiltroLivello("tutte");
   }
 
   async function handleScriviConferme() {
@@ -350,7 +361,7 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
         <Btn onClick={() => selezionaLivello("bassa")} disabled={conteggioPerLivello.bassa === 0} variant="ghost">
           Bassa ({conteggioPerLivello.bassa})
         </Btn>
-        <Btn onClick={deselezionaTutto} disabled={selezionate.size === 0} variant="ghost">
+        <Btn onClick={deselezionaTutto} disabled={selezionate.size === 0 && filtroLivello === "tutte"} variant="ghost">
           Nessuna
         </Btn>
         <Btn onClick={handleAccettaSelezionate} disabled={selezionate.size === 0}>
@@ -359,9 +370,17 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
       </div>
       {llmMsg && <p style={{ margin: 0, fontSize: 12, color: "#9b9ba0" }}>{llmMsg}</p>}
       {writeMsg && <p style={{ margin: 0, fontSize: 12, color: "#9b9ba0" }}>{writeMsg}</p>}
+      {filtroLivello !== "tutte" && (
+        <p style={{ margin: 0, fontSize: 12, color: "#f59e0b" }}>
+          Filtro attivo: solo confidence &quot;{filtroLivello}&quot; ({righeFiltrate.length} righe) —{" "}
+          <button onClick={() => setFiltroLivello("tutte")} style={{ background: "none", border: "none", color: "#f59e0b", textDecoration: "underline", cursor: "pointer", padding: 0, fontSize: 12 }}>
+            mostra tutte ({righeVisibili.length})
+          </button>
+        </p>
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {righeVisibili.map((row) => {
+        {righeFiltrate.map((row) => {
           const s = suggerimenti.get(row.rowIndex);
           const inEditing = editRowIndex === row.rowIndex;
           return (
@@ -438,8 +457,12 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
             </div>
           );
         })}
-        {righeVisibili.length === 0 && (
-          <p style={{ fontSize: 13, color: "#6b6b70" }}>Nessuna riga da classificare al momento.</p>
+        {righeFiltrate.length === 0 && (
+          <p style={{ fontSize: 13, color: "#6b6b70" }}>
+            {righeVisibili.length === 0
+              ? "Nessuna riga da classificare al momento."
+              : "Nessuna riga con questo filtro."}
+          </p>
         )}
       </div>
     </div>
