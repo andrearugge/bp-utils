@@ -101,7 +101,7 @@ Vincoli fissi:
 
 ## Fase 5 — UI di revisione `/classifica-acquisti`
 
-- [ ] **5.1** `app/classifica-acquisti/page.tsx` — scaffold: auth Google + caricamento tab
+- [x] **5.1** `app/classifica-acquisti/page.tsx` — scaffold: auth Google + caricamento tab
       (riuso pattern step di `invia-bp`), stato in memoria
 - [ ] **5.2** Vista "Da classificare": righe non taggate con suggerimento, confidence, metodo
       ed evidenza (match storico usato / regola / LLM); azioni accetta / modifica / scarta,
