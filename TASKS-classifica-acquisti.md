@@ -53,7 +53,7 @@ Vincoli fissi:
       condiviso; `invia-bp` continua a funzionare (re-export o aggiornamento import)
 - [x] **1.2** `lib/google-sheets/read.ts` — `readTab`: lettura completa tab via `values.get`,
       mapping header→campi per nome colonna (non per posizione), inclusa colonna Tag Source
-- [ ] **1.3** `lib/google-sheets/write.ts` — `batchUpdateCells`: scrittura mirata di celle singole
+- [x] **1.3** `lib/google-sheets/write.ts` — `batchUpdateCells`: scrittura mirata di celle singole
       via `values.batchUpdate` (mai riga intera, mai colonna Indirect)
 - [ ] **1.4** `lib/google-sheets/log.ts` — gestione tab "Classifier Log": creazione se assente
       (`batchUpdate` + `addSheet`), append righe di log
