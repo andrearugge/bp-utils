@@ -5,7 +5,7 @@
 // non viene riproposta ai prossimi caricamenti (letto all'avvio di questa vista).
 
 import { useEffect, useState } from "react";
-import { AcquistoRowTaggata, Classificazione, Anomalia, Severita, CENTRI_COSTO, CATEGORIE, TYPES, DIRECT_VALUES } from "@/lib/classifica-acquisti/types";
+import { AcquistoRowTaggata, Classificazione, Anomalia, Asse, ASSI, Severita, CENTRI_COSTO, CATEGORIE, TYPES, DIRECT_VALUES } from "@/lib/classifica-acquisti/types";
 import { rileviAnomalie } from "@/lib/classifica-acquisti/anomalie";
 import { TabData, readTab } from "@/lib/google-sheets/read";
 import { batchUpdateCells, CellUpdate } from "@/lib/google-sheets/write";
@@ -59,6 +59,19 @@ function Select({ value, onChange, options }: { value: string; onChange: (v: str
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
   );
+}
+
+const ETICHETTE_ASSE: Record<Asse, string> = {
+  centroCosto: "Centro costo",
+  categoria: "Categoria",
+  type: "Type",
+  direct: "Direct",
+};
+
+/** Assi dove valoriAttesi propone un valore diverso da quello sul foglio. */
+function assiModificati(a: Anomalia, row: AcquistoRowTaggata): Asse[] {
+  if (!a.valoriAttesi) return [];
+  return ASSI.filter((asse) => a.valoriAttesi![asse] !== undefined && a.valoriAttesi![asse] !== row[asse]);
 }
 
 function coloreSeverita(s: Severita): string {
@@ -216,6 +229,19 @@ export default function AnomalieView({ token, sheetId, tabName, tab, groundTruth
                 <p style={{ margin: 0, fontSize: 12, color: "#6b6b70" }}>
                   Sul foglio: {row.centroCosto} · {row.categoria} · {row.type} · Direct {row.direct}%
                 </p>
+              )}
+
+              {row && assiModificati(a, row).length > 0 && (
+                <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: 6, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
+                  <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "#f59e0b" }}>Correzione proposta:</p>
+                  {assiModificati(a, row).map((asse) => (
+                    <p key={asse} style={{ margin: 0, fontSize: 12, color: "#e8e6e1" }}>
+                      {ETICHETTE_ASSE[asse]}: <span style={{ color: "#6b6b70" }}>{String(row[asse])}</span>
+                      {" → "}
+                      <strong>{String(a.valoriAttesi![asse])}{asse === "direct" ? "%" : ""}</strong>
+                    </p>
+                  ))}
+                </div>
               )}
 
               {inEditing && editValori ? (

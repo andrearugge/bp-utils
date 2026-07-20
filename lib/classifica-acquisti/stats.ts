@@ -94,9 +94,13 @@ export function rileviTagIncoerenti(rows: AcquistoRowTaggata[]): Anomalia[] {
     if (righe.length < 2) continue;
 
     const conteggioPerCombo = new Map<string, number>();
+    const esempioPerCombo = new Map<string, Classificazione>();
     for (const r of righe) {
       const combo = chiaveCoerenza(r);
       conteggioPerCombo.set(combo, (conteggioPerCombo.get(combo) ?? 0) + 1);
+      if (!esempioPerCombo.has(combo)) {
+        esempioPerCombo.set(combo, { centroCosto: r.centroCosto, categoria: r.categoria, type: r.type, direct: r.direct });
+      }
     }
     if (conteggioPerCombo.size <= 1) continue;
 
@@ -108,12 +112,16 @@ export function rileviTagIncoerenti(rows: AcquistoRowTaggata[]): Anomalia[] {
         comboMaggioritaria = combo;
       }
     }
+    // Valori concreti della combinazione maggioritaria: usati come proposta di
+    // correzione (solo gli assi che differiscono dalla riga vengono mostrati).
+    const valoriMaggioritari = esempioPerCombo.get(comboMaggioritaria)!;
 
     for (const r of righe) {
       if (chiaveCoerenza(r) === comboMaggioritaria) continue;
       anomalie.push({
         rowIndex: r.rowIndex,
         tipo: "tag-incoerenti",
+        valoriAttesi: valoriMaggioritari,
         motivazione:
           `Fornitore "${chiave}": combinazione diversa dalla maggioranza delle sue ` +
           `${righe.length} righe storiche (${maxOccorrenze} concordi), nessuna regola nota la giustifica`,
