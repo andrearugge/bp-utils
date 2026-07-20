@@ -123,6 +123,70 @@ export function parseCsvRecords(content: string): string[][] {
   return records;
 }
 
+export interface RisultatoCampi {
+  /** null se la riga va scartata (vedi avvisi per il motivo). */
+  row: AcquistoRow | null;
+  /** Motivi di avviso senza rowIndex: il chiamante lo associa (CSV o foglio). */
+  avvisi: string[];
+}
+
+/**
+ * Mappa i campi di una riga (indicizzati per nome colonna, sia da CSV che da
+ * lettura del foglio) in un `AcquistoRow`. Nucleo condiviso da `parseAcquistiCsv`
+ * e da chi legge la tab direttamente dal foglio (es. il backfill di Fase 2).
+ */
+export function parseAcquistoFields(fields: Record<string, string>, rowIndex: number): RisultatoCampi {
+  const get = (name: string) => fields[name] ?? "";
+  const avvisi: string[] = [];
+
+  const dataRaw = get("Data").trim();
+  const imponibileRaw = get("Imponibile").trim();
+  if (dataRaw === "" && imponibileRaw === "") {
+    return { row: null, avvisi: ["riga senza data né importo, saltata"] };
+  }
+
+  const dataISO = parseDataISO(dataRaw);
+  if (dataISO === null) {
+    return { row: null, avvisi: [`data non riconosciuta: "${dataRaw}", riga saltata`] };
+  }
+  const imponibile = parseImporto(imponibileRaw);
+  if (imponibile === null) {
+    return { row: null, avvisi: [`importo non riconosciuto: "${imponibileRaw}", riga saltata`] };
+  }
+
+  const centroCosto = parseEnum<CentroCosto>(get("Centro costo"), CENTRI_COSTO);
+  const categoria = parseEnum<Categoria>(get("Categoria"), CATEGORIE);
+  const type = parseEnum<Type>(get("Type"), TYPES);
+  const tagSource = parseEnum<TagSource>(get("Tag Source"), TAG_SOURCES);
+  for (const [nome, res] of [
+    ["Centro costo", centroCosto],
+    ["Categoria", categoria],
+    ["Type", type],
+    ["Tag Source", tagSource],
+  ] as const) {
+    if (res.fuoriTassonomia) {
+      avvisi.push(`valore fuori tassonomia in ${nome}, trattato come vuoto`);
+    }
+  }
+
+  const row: AcquistoRow = {
+    rowIndex,
+    data: dataRaw,
+    dataISO,
+    centroCosto: centroCosto.valore,
+    categoria: categoria.valore,
+    type: type.valore,
+    direct: parsePercent(get("Direct")),
+    indirect: parsePercent(get("Indirect")),
+    fornitore: decodeHtmlEntities(get("Fornitore")).trim(),
+    descrizione: decodeHtmlEntities(get("Descrizione")).trim(),
+    imponibile,
+    noteAdmin: get("Note Admin").trim(),
+    tagSource: tagSource.valore,
+  };
+  return { row, avvisi };
+}
+
 /**
  * Parsa l'export CSV della tab Acquisti - ACT. Il mapping colonne è per nome
  * di header, non per posizione; la colonna "Tag Source" è opzionale
@@ -133,29 +197,14 @@ export function parseAcquistiCsv(content: string): RisultatoParse {
   if (records.length === 0) return { rows: [], avvisi: [] };
 
   const header = records[0].map((h) => h.trim());
-  const col = (name: string) => header.indexOf(name);
-  const idx = {
-    data: col("Data"),
-    centroCosto: col("Centro costo"),
-    categoria: col("Categoria"),
-    type: col("Type"),
-    direct: col("Direct"),
-    indirect: col("Indirect"),
-    fornitore: col("Fornitore"),
-    descrizione: col("Descrizione"),
-    imponibile: col("Imponibile"),
-    noteAdmin: col("Note Admin"),
-    tagSource: col("Tag Source"),
-  };
   const obbligatorie = ["Data", "Centro costo", "Categoria", "Type", "Direct", "Fornitore", "Descrizione", "Imponibile"];
-  const mancanti = obbligatorie.filter((name) => col(name) === -1);
+  const mancanti = obbligatorie.filter((name) => !header.includes(name));
   if (mancanti.length > 0) {
     throw new Error(`Colonne mancanti nell'export: ${mancanti.join(", ")}`);
   }
 
   const rows: AcquistoRow[] = [];
   const avvisi: AvvisoParse[] = [];
-  const get = (record: string[], i: number) => (i >= 0 && i < record.length ? record[i] : "");
 
   for (let r = 1; r < records.length; r++) {
     const record = records[r];
@@ -163,54 +212,14 @@ export function parseAcquistiCsv(content: string): RisultatoParse {
 
     if (record.every((f) => f.trim() === "")) continue;
 
-    const dataRaw = get(record, idx.data).trim();
-    const imponibileRaw = get(record, idx.imponibile).trim();
-    if (dataRaw === "" && imponibileRaw === "") {
-      avvisi.push({ rowIndex, motivo: "riga senza data né importo, saltata" });
-      continue;
-    }
-
-    const dataISO = parseDataISO(dataRaw);
-    if (dataISO === null) {
-      avvisi.push({ rowIndex, motivo: `data non riconosciuta: "${dataRaw}", riga saltata` });
-      continue;
-    }
-    const imponibile = parseImporto(imponibileRaw);
-    if (imponibile === null) {
-      avvisi.push({ rowIndex, motivo: `importo non riconosciuto: "${imponibileRaw}", riga saltata` });
-      continue;
-    }
-
-    const centroCosto = parseEnum<CentroCosto>(get(record, idx.centroCosto), CENTRI_COSTO);
-    const categoria = parseEnum<Categoria>(get(record, idx.categoria), CATEGORIE);
-    const type = parseEnum<Type>(get(record, idx.type), TYPES);
-    const tagSource = parseEnum<TagSource>(get(record, idx.tagSource), TAG_SOURCES);
-    for (const [nome, res] of [
-      ["Centro costo", centroCosto],
-      ["Categoria", categoria],
-      ["Type", type],
-      ["Tag Source", tagSource],
-    ] as const) {
-      if (res.fuoriTassonomia) {
-        avvisi.push({ rowIndex, motivo: `valore fuori tassonomia in ${nome}, trattato come vuoto` });
-      }
-    }
-
-    rows.push({
-      rowIndex,
-      data: dataRaw,
-      dataISO,
-      centroCosto: centroCosto.valore,
-      categoria: categoria.valore,
-      type: type.valore,
-      direct: parsePercent(get(record, idx.direct)),
-      indirect: parsePercent(get(record, idx.indirect)),
-      fornitore: decodeHtmlEntities(get(record, idx.fornitore)).trim(),
-      descrizione: decodeHtmlEntities(get(record, idx.descrizione)).trim(),
-      imponibile,
-      noteAdmin: get(record, idx.noteAdmin).trim(),
-      tagSource: tagSource.valore,
+    const fields: Record<string, string> = {};
+    header.forEach((h, i) => {
+      fields[h] = record[i] ?? "";
     });
+
+    const { row, avvisi: rowAvvisi } = parseAcquistoFields(fields, rowIndex);
+    for (const motivo of rowAvvisi) avvisi.push({ rowIndex, motivo });
+    if (row) rows.push(row);
   }
 
   return { rows, avvisi };
