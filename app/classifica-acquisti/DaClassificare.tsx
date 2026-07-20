@@ -19,14 +19,11 @@ import {
 } from "@/lib/classifica-acquisti/types";
 import { Lookup, matchRow, topFuzzyMatches } from "@/lib/classifica-acquisti/match";
 import { buildSuggerimento } from "@/lib/classifica-acquisti/confidence";
+import { CLASSIFIER_LOG_TAB_NAME, CLASSIFIER_LOG_HEADER, costruisciRigaLog } from "@/lib/classifica-acquisti/classifier-log";
 import { TabData } from "@/lib/google-sheets/read";
 import { batchUpdateCells, CellUpdate } from "@/lib/google-sheets/write";
 import { ensureLogTab, appendLogRows } from "@/lib/google-sheets/log";
 
-const LOG_TAB_NAME = "Classifier Log";
-const LOG_HEADER = [
-  "Timestamp", "Riga", "Fornitore", "Descrizione", "Valori proposti", "Metodo", "Score", "Evidenza", "Esito",
-];
 /** Righe per chiamata a /api/classify: sotto il limite del server (100), per lasciare margine ai token. */
 const LLM_CHUNK_SIZE = 50;
 
@@ -99,6 +96,7 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
   const [suggerimenti, setSuggerimenti] = useState<Map<number, Suggerimento | null>>(new Map());
   const [coda, setCoda] = useState<Map<number, RigaClassificata>>(new Map());
   const [selezionate, setSelezionate] = useState<Set<number>>(new Set());
+  const [scartate, setScartate] = useState<Set<number>>(new Set());
   const [filtroLivello, setFiltroLivello] = useState<"tutte" | "alta" | "media" | "bassa">("tutte");
   const [editRowIndex, setEditRowIndex] = useState<number | null>(null);
   const [editValori, setEditValori] = useState<Classificazione | null>(null);
@@ -116,10 +114,11 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
     setSuggerimenti(m);
     setCoda(new Map());
     setSelezionate(new Set());
+    setScartate(new Set());
     setFiltroLivello("tutte");
   }, [rows, lookup]);
 
-  const righeVisibili = rows.filter((r) => !coda.has(r.rowIndex));
+  const righeVisibili = rows.filter((r) => !coda.has(r.rowIndex) && !scartate.has(r.rowIndex));
   const righeFiltrate =
     filtroLivello === "tutte"
       ? righeVisibili
@@ -228,13 +227,41 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
     stageRiga(rowIndex, s.valori, "auto", s.metodo, s.score, s.evidenza);
   }
 
-  function handleScarta(rowIndex: number) {
+  async function handleScarta(rowIndex: number) {
     setSelezionate((prev) => {
       const next = new Set(prev);
       next.delete(rowIndex);
       return next;
     });
     if (editRowIndex === rowIndex) setEditRowIndex(null);
+    // Rimuove la riga dalla revisione di questa sessione: lo scarto è
+    // un esito a sé (non scrive celle), ma va comunque nel Classifier Log.
+    setScartate((prev) => new Set(prev).add(rowIndex));
+
+    const row = rigaByIndex(rowIndex);
+    if (!row) return;
+    const s = suggerimenti.get(rowIndex);
+    try {
+      await ensureLogTab(token, sheetId, CLASSIFIER_LOG_TAB_NAME, CLASSIFIER_LOG_HEADER);
+      await appendLogRows(token, sheetId, CLASSIFIER_LOG_TAB_NAME, [
+        costruisciRigaLog(
+          {
+            data: row.data,
+            fornitore: row.fornitore,
+            descrizione: row.descrizione,
+            imponibile: row.imponibile,
+            metodo: s?.metodo ?? "nessuno",
+            score: s?.score ?? 0,
+            evidenza: s?.evidenza ?? "Nessun suggerimento disponibile",
+            esito: "scartato",
+          },
+          new Date().toISOString(),
+        ),
+      ]);
+    } catch {
+      // Lo scarto resta effettivo in UI anche se il log fallisce: non è
+      // una scrittura di classificazione, non blocchiamo l'utente per questo.
+    }
   }
 
   function handleApriModifica(rowIndex: number) {
@@ -311,23 +338,28 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
       }
       const n = await batchUpdateCells(token, sheetId, tabName, tab.headers, updates);
 
-      await ensureLogTab(token, sheetId, LOG_TAB_NAME, LOG_HEADER);
+      await ensureLogTab(token, sheetId, CLASSIFIER_LOG_TAB_NAME, CLASSIFIER_LOG_HEADER);
       const timestamp = new Date().toISOString();
       const logRows = voci.map((v) => {
         const row = rigaByIndex(v.rowIndex);
-        return [
+        return costruisciRigaLog(
+          {
+            data: row?.data ?? "",
+            fornitore: row?.fornitore ?? "",
+            descrizione: row?.descrizione ?? "",
+            imponibile: row?.imponibile ?? 0,
+            valori: v.valori,
+            metodo: v.metodo,
+            score: v.score,
+            evidenza: v.evidenza,
+            // Tag Source sul foglio resta auto/confirmed (vocabolario fisso);
+            // il Classifier Log usa il vocabolario canonico accettato/modificato.
+            esito: v.esito === "auto" ? "accettato" : "modificato",
+          },
           timestamp,
-          String(v.rowIndex),
-          row?.fornitore ?? "",
-          row?.descrizione ?? "",
-          JSON.stringify(v.valori),
-          v.metodo,
-          v.score.toFixed(2),
-          v.evidenza,
-          v.esito,
-        ];
+        );
       });
-      await appendLogRows(token, sheetId, LOG_TAB_NAME, logRows);
+      await appendLogRows(token, sheetId, CLASSIFIER_LOG_TAB_NAME, logRows);
 
       setWriteMsg(`${n} celle scritte, ${logRows.length} righe di log accodate.`);
       setCoda(new Map());

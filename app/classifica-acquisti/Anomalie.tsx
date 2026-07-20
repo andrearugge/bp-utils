@@ -7,14 +7,11 @@
 import { useEffect, useState } from "react";
 import { AcquistoRowTaggata, Classificazione, Anomalia, Asse, ASSI, Severita, CENTRI_COSTO, CATEGORIE, TYPES, DIRECT_VALUES } from "@/lib/classifica-acquisti/types";
 import { rileviAnomalie } from "@/lib/classifica-acquisti/anomalie";
+import { CLASSIFIER_LOG_TAB_NAME, CLASSIFIER_LOG_HEADER, costruisciRigaLog, riferimentoRiga, EsitoLog } from "@/lib/classifica-acquisti/classifier-log";
 import { TabData, readTab } from "@/lib/google-sheets/read";
 import { batchUpdateCells, CellUpdate } from "@/lib/google-sheets/write";
 import { ensureLogTab, appendLogRows } from "@/lib/google-sheets/log";
 
-const LOG_TAB_NAME = "Classifier Log";
-const LOG_HEADER = [
-  "Timestamp", "Riga", "Fornitore", "Descrizione", "Valori proposti", "Metodo", "Score", "Evidenza", "Esito",
-];
 const PREFISSO_ANOMALIA = "anomalia:";
 
 interface Props {
@@ -25,8 +22,17 @@ interface Props {
   groundTruth: AcquistoRowTaggata[];
 }
 
-function rigaKey(a: Anomalia): string {
-  return `${a.rowIndex}|${a.tipo}`;
+/** Chiave stabile riga+tipo, basata su data/fornitore/importo (non sul numero
+ * di riga) così coincide con quanto scritto e riletto dal Classifier Log. */
+function rigaKey(a: Anomalia, row: AcquistoRowTaggata | undefined): string {
+  return row ? `${riferimentoRiga(row)}|${a.tipo}` : `${a.rowIndex}|${a.tipo}`;
+}
+
+/** Score numerico di supporto per il log, dalla severità categorica dell'anomalia. */
+function scoreDaSeverita(a: Anomalia): number {
+  if (a.severita === "alta") return 1;
+  if (a.severita === "media") return 0.6;
+  return 0.3;
 }
 
 function Btn({ onClick, disabled, children, variant = "primary" }: {
@@ -97,12 +103,12 @@ export default function AnomalieView({ token, sheetId, tabName, tab, groundTruth
 
       const ignorateDalLog = new Set<string>();
       try {
-        const log = await readTab(token, sheetId, LOG_TAB_NAME);
+        const log = await readTab(token, sheetId, CLASSIFIER_LOG_TAB_NAME);
         for (const r of log.rows) {
           const esito = r.values["Esito"] ?? "";
           const metodo = r.values["Metodo"] ?? "";
           const riga = r.values["Riga"] ?? "";
-          if (esito === "ignorato" && metodo.startsWith(PREFISSO_ANOMALIA)) {
+          if (esito === "scartato" && metodo.startsWith(PREFISSO_ANOMALIA)) {
             ignorateDalLog.add(`${riga}|${metodo.slice(PREFISSO_ANOMALIA.length)}`);
           }
         }
@@ -127,31 +133,34 @@ export default function AnomalieView({ token, sheetId, tabName, tab, groundTruth
     return groundTruth.find((r) => r.rowIndex === rowIndex);
   }
 
-  const visibili = anomalie.filter((a) => !ignorate.has(rigaKey(a)));
+  const visibili = anomalie.filter((a) => !ignorate.has(rigaKey(a, rigaByIndex(a.rowIndex))));
 
-  async function logEsito(a: Anomalia, esito: "ignorato" | "corretto", valoriScritti?: Classificazione) {
-    await ensureLogTab(token, sheetId, LOG_TAB_NAME, LOG_HEADER);
+  async function logEsito(a: Anomalia, esito: EsitoLog, valoriScritti?: Classificazione) {
     const row = rigaByIndex(a.rowIndex);
-    await appendLogRows(token, sheetId, LOG_TAB_NAME, [
-      [
+    await ensureLogTab(token, sheetId, CLASSIFIER_LOG_TAB_NAME, CLASSIFIER_LOG_HEADER);
+    await appendLogRows(token, sheetId, CLASSIFIER_LOG_TAB_NAME, [
+      costruisciRigaLog(
+        {
+          data: row?.data ?? "",
+          fornitore: row?.fornitore ?? "",
+          descrizione: row?.descrizione ?? "",
+          imponibile: row?.imponibile ?? 0,
+          valori: valoriScritti,
+          metodo: `${PREFISSO_ANOMALIA}${a.tipo}`,
+          score: scoreDaSeverita(a),
+          evidenza: a.motivazione,
+          esito,
+        },
         new Date().toISOString(),
-        String(a.rowIndex),
-        row?.fornitore ?? "",
-        row?.descrizione ?? "",
-        valoriScritti ? JSON.stringify(valoriScritti) : "",
-        `${PREFISSO_ANOMALIA}${a.tipo}`,
-        "",
-        a.motivazione,
-        esito,
-      ],
+      ),
     ]);
   }
 
   async function handleIgnora(a: Anomalia) {
     setAzioneMsg(null);
     try {
-      await logEsito(a, "ignorato");
-      setIgnorate((prev) => new Set(prev).add(rigaKey(a)));
+      await logEsito(a, "scartato");
+      setIgnorate((prev) => new Set(prev).add(rigaKey(a, rigaByIndex(a.rowIndex))));
     } catch (err) {
       setAzioneMsg(err instanceof Error ? err.message : "Errore nella scrittura del log.");
     }
@@ -160,7 +169,7 @@ export default function AnomalieView({ token, sheetId, tabName, tab, groundTruth
   function handleApriCorreggi(a: Anomalia) {
     const row = rigaByIndex(a.rowIndex);
     if (!row) return;
-    setEditKey(rigaKey(a));
+    setEditKey(rigaKey(a, row));
     setEditValori({
       centroCosto: a.valoriAttesi?.centroCosto ?? row.centroCosto,
       categoria: a.valoriAttesi?.categoria ?? row.categoria,
@@ -184,8 +193,8 @@ export default function AnomalieView({ token, sheetId, tabName, tab, groundTruth
         { rowIndex: a.rowIndex, column: "Tag Source", value: "confirmed" },
       ];
       await batchUpdateCells(token, sheetId, tabName, tab.headers, updates);
-      await logEsito(a, "corretto", editValori);
-      setIgnorate((prev) => new Set(prev).add(rigaKey(a)));
+      await logEsito(a, "modificato", editValori);
+      setIgnorate((prev) => new Set(prev).add(rigaKey(a, rigaByIndex(a.rowIndex))));
       setEditKey(null);
       setEditValori(null);
       setAzioneMsg(`Riga ${a.rowIndex} corretta e loggata.`);
@@ -208,7 +217,7 @@ export default function AnomalieView({ token, sheetId, tabName, tab, groundTruth
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {visibili.map((a) => {
           const row = rigaByIndex(a.rowIndex);
-          const key = rigaKey(a);
+          const key = rigaKey(a, row);
           const inEditing = editKey === key;
           return (
             <div key={key} style={{ border: "1px solid #2a2a30", borderRadius: 8, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>

@@ -120,7 +120,7 @@ Vincoli fissi:
 
 ## Fase 6 — Audit trail e rifiniture
 
-- [ ] **6.1** Schema tab "Classifier Log": timestamp, riga (data+fornitore+importo), valori
+- [x] **6.1** Schema tab "Classifier Log": timestamp, riga (data+fornitore+importo), valori
       proposti, metodo, score, evidenza sintetica, esito (accettato/modificato/scartato)
 - [ ] **6.2** Test end-to-end sul foglio reale: classificare giugno 2026 con revisione completa
 - [ ] **6.3** (opzionale) Aggiornare `app/api/extract/route.ts` allo stesso pattern
