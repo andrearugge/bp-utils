@@ -68,7 +68,7 @@ Vincoli fissi:
 - [ ] **2.2** Backfill una-tantum della colonna Tag Source sul foglio: righe taggate fino a
       mag 2026 → `manual` (validate a mano, colori già puliti); proposta batch con conferma
       utente prima della scrittura
-- [ ] **2.3** Gestire nel backfill le 2 righe con Direct vuoto e la riga di maggio non taggata
+- [x] **2.3** Gestire nel backfill le 2 righe con Direct vuoto e la riga di maggio non taggata
       (segnalarle all'utente, non inventare valori)
 
 ---
