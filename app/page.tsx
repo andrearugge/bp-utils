@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { FileText, FileSpreadsheet, TrendingUp } from "lucide-react";
+import { FileText, FileSpreadsheet, TrendingUp, Tags } from "lucide-react";
 import { PinModal } from "@/components/PinModal";
 
 const ADMIN_STORAGE_KEY = "bp-admin-unlocked";
@@ -58,6 +58,12 @@ const ADMIN_TOOLS = [
     Icon: TrendingUp,
     title: "Piano Incentivi",
     description: "Calcola il piano incentivo per i soci basato su fatturato e EBITDA trimestrale.",
+  },
+  {
+    href: "/classifica-acquisti",
+    Icon: Tags,
+    title: "Classifica Acquisti",
+    description: "Classifica automaticamente le righe della tab Acquisti - ACT e segnala anomalie sulle righe già taggate.",
   },
 ];
 

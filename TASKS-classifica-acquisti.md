@@ -114,7 +114,7 @@ Vincoli fissi:
 - [x] **5.5** Vista "Metriche": accuratezza LOO per asse, copertura per metodo
       (esatto / fuzzy / LLM), n. righe per Tag Source
 - [x] **5.6** Card in home (`app/page.tsx`) per il nuovo strumento
-- [ ] **5.7** `npm run build` + `tsc --noEmit` puliti
+- [x] **5.7** `npm run build` + `tsc --noEmit` puliti
 
 ---
 
