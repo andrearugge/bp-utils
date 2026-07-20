@@ -84,7 +84,7 @@ Vincoli fissi:
 - [x] **3.3** Riusare/estrarre `fetchWithRetry` da `app/api/extract/route.ts` in util condivisa
 - [x] **3.4** Nel prompt: passare per ogni riga i top match fuzzy come contesto (l'LLM decide
       con lo storico sotto gli occhi, non alla cieca)
-- [ ] **3.5** Test manuale con le righe di giugno realmente prive di storico
+- [x] **3.5** Test manuale con le righe di giugno realmente prive di storico
 
 ---
 
