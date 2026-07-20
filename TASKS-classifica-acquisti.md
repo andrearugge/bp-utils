@@ -35,7 +35,7 @@ Vincoli fissi:
       fornitore normalizzato, voto di maggioranza **pesato per recency** (decadimento esponenziale
       sulla data), regole deterministiche a valle (Leasing & Noleggi → Material;
       Cross BL → Direct 0; Direct+Indirect coerenti)
-- [ ] **0.6** `lib/classifica-acquisti/confidence.ts` — confidence evidence-based: composizione di
+- [x] **0.6** `lib/classifica-acquisti/confidence.ts` — confidence evidence-based: composizione di
       similarità match, n. occorrenze, consistenza storica delle etichette, accordo tra metodi.
       Soglie: `alta` (auto-proponibile) / `media` (rivedere) / `bassa` (→ fallback LLM)
 - [ ] **0.7** `scripts/cross-validate.ts` — harness leave-one-out eseguibile offline (`npx tsx`):
