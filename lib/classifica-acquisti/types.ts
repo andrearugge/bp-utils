@@ -28,7 +28,7 @@ export type TagSource = (typeof TAG_SOURCES)[number];
 
 /** Riga della tab Acquisti - ACT (dall'export CSV o dalla lettura del foglio). */
 export interface AcquistoRow {
-  /** Indice riga nell'origine (1-based, header escluso) — per riferire la riga sul foglio. */
+  /** Numero riga stile foglio (header = 1, prima riga dati = 2) — per riferire la riga sul foglio. */
   rowIndex: number;
   data: string; // DD/MM/YYYY come sul foglio
   dataISO: string; // YYYY-MM-DD, per ordinamenti e decadimento recency

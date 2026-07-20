@@ -24,7 +24,7 @@ Vincoli fissi:
 - [x] **0.1** `lib/classifica-acquisti/types.ts` — tipi: `AcquistoRow`, tassonomia come const
       (centri costo, categorie, type, direct), `Suggerimento` (valori + score + evidenza + metodo),
       `Anomalia`, `TagSource`
-- [ ] **0.2** `lib/classifica-acquisti/parse-csv.ts` — parser dell'export: date `dd/mm/yyyy`,
+- [x] **0.2** `lib/classifica-acquisti/parse-csv.ts` — parser dell'export: date `dd/mm/yyyy`,
       importi `€ 1.234,56` → number, percentuali → 0|100, decode entità HTML, righe vuote/malformate
 - [ ] **0.3** `lib/classifica-acquisti/normalize.ts` — normalizzazione fornitore: lowercase, trim,
       rimozione forme giuridiche (srl, spa, snc, sas, ltd, inc, sarl, gmbh…), punteggiatura,
