@@ -4,6 +4,34 @@ import { fetchWithRetry } from "@/lib/anthropic/fetch-with-retry";
 
 export const maxDuration = 60;
 
+const MODEL = "claude-sonnet-5";
+
+const EXTRACT_TOOL = {
+  name: "extract_invoice",
+  description: "Registra i dati estratti da una fattura o ricevuta.",
+  input_schema: {
+    type: "object",
+    properties: {
+      data: { type: "string", description: "Data fattura in formato DD/MM/YYYY, o N/D" },
+      fornitore: { type: "string" },
+      descrizione: { type: "string", description: "Max 80 caratteri" },
+      imponibile: { type: "string", description: "Numero con 2 decimali, senza simbolo valuta, es. 80.00" },
+      valuta: { type: "string", description: "Codice valuta ISO, es. EUR, USD, GBP" },
+      numero_fattura: { type: "string" },
+      paese: { type: "string", description: "Codice ISO a 2 lettere del paese del fornitore" },
+      area: { type: "string", enum: ["ITALIA", "INTRA-UE", "EXTRA-UE"] },
+      tasso_cambio: { anyOf: [{ type: "number" }, { type: "null" }] },
+      imponibile_eur: { anyOf: [{ type: "string" }, { type: "null" }] },
+    },
+    required: [
+      "data", "fornitore", "descrizione", "imponibile", "valuta",
+      "numero_fattura", "paese", "area", "tasso_cambio", "imponibile_eur",
+    ],
+    additionalProperties: false,
+  },
+  strict: true,
+};
+
 export async function POST(request: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -41,18 +69,15 @@ export async function POST(request: NextRequest) {
       };
 
   const anthropicBody = JSON.stringify({
-    model: "claude-sonnet-4-6",
+    model: MODEL,
     max_tokens: 1000,
+    system: [{ type: "text", text: EXTRACTION_PROMPT, cache_control: { type: "ephemeral" } }],
+    tools: [EXTRACT_TOOL],
+    tool_choice: { type: "tool", name: "extract_invoice" },
     messages: [
       {
         role: "user",
-        content: [
-          contentBlock,
-          {
-            type: "text",
-            text: EXTRACTION_PROMPT,
-          },
-        ],
+        content: [contentBlock],
       },
     ],
   });
@@ -84,15 +109,18 @@ export async function POST(request: NextRequest) {
   }
 
   const result = await anthropicResponse.json();
-  const text: string = result?.content?.[0]?.text ?? "";
 
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
+  if (result.stop_reason === "refusal") {
+    return NextResponse.json({ error: "Richiesta rifiutata dal modello" }, { status: 502 });
+  }
+
+  const toolUse = (result.content ?? []).find(
+    (block: { type: string }) => block.type === "tool_use"
+  );
+  if (!toolUse) {
     return NextResponse.json(
-      { error: `Risposta non parsabile: ${text.slice(0, 200)}` },
-      { status: 500 }
+      { error: "Nessuna tool_use nella risposta del modello" },
+      { status: 502 }
     );
   }
 
@@ -109,5 +137,5 @@ export async function POST(request: NextRequest) {
     if (val) responseHeaders[key] = val;
   }
 
-  return NextResponse.json(parsed, { headers: responseHeaders });
+  return NextResponse.json(toolUse.input, { headers: responseHeaders });
 }

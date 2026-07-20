@@ -122,8 +122,8 @@ Vincoli fissi:
 
 - [x] **6.1** Schema tab "Classifier Log": timestamp, riga (data+fornitore+importo), valori
       proposti, metodo, score, evidenza sintetica, esito (accettato/modificato/scartato)
-- [ ] **6.2** Test end-to-end sul foglio reale: classificare giugno 2026 con revisione completa
-- [ ] **6.3** (opzionale) Aggiornare `app/api/extract/route.ts` allo stesso pattern
+- [~] **6.2** Test end-to-end sul foglio reale: classificare giugno 2026 con revisione completa
+- [x] **6.3** (opzionale) Aggiornare `app/api/extract/route.ts` allo stesso pattern
       structured output + modello recente
 - [ ] **6.4** Dismissione script Apps Script v4.0 (disattivare trigger) una volta validato il flusso
 

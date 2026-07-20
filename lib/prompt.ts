@@ -11,9 +11,9 @@ Analizza questo documento (fattura o ricevuta) ed estrai ESATTAMENTE questi camp
 - tasso_cambio: se la valuta NON è EUR, indica il tasso di cambio approssimativo verso EUR alla data della fattura (es. per USD->EUR circa 0.92). Se la valuta è EUR, usa null.
 - imponibile_eur: se la valuta NON è EUR, calcola l'equivalente in EUR usando il tasso_cambio. Se la valuta è EUR, usa null.
 
-Rispondi SOLO con un oggetto JSON valido, senza markdown, senza backtick, senza altro testo. Esempi:
+Esempi di estrazione corretta:
 {"data":"15/03/2025","fornitore":"SiteGround Spain S.L.","descrizione":"Cloud Hosting mensile","imponibile":"80.00","valuta":"EUR","numero_fattura":"4441398","paese":"ES","area":"INTRA-UE","tasso_cambio":null,"imponibile_eur":null}
 {"data":"20/03/2025","fornitore":"Stripe Inc","descrizione":"Commissioni pagamenti","imponibile":"50.00","valuta":"USD","numero_fattura":"INV-8821","paese":"US","area":"EXTRA-UE","tasso_cambio":0.92,"imponibile_eur":"46.00"}
 {"data":"03/02/2025","fornitore":"Marco Rossi","descrizione":"Prestazione occasionale","imponibile":"500.00","valuta":"EUR","numero_fattura":"1","paese":"IT","area":"ITALIA","tasso_cambio":null,"imponibile_eur":null}
 
-Se non riesci a estrarre un campo, usa "N/D".`;
+Se non riesci a estrarre un campo testuale, usa "N/D". Chiama lo strumento extract_invoice con i campi estratti.`;
