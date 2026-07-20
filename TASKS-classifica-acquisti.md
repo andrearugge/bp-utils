@@ -51,7 +51,7 @@ Vincoli fissi:
 
 - [x] **1.1** `lib/google-sheets/auth.ts` — estrarre l'auth GIS da `lib/invia-bp/auth.ts` in modulo
       condiviso; `invia-bp` continua a funzionare (re-export o aggiornamento import)
-- [ ] **1.2** `lib/google-sheets/read.ts` — `readTab`: lettura completa tab via `values.get`,
+- [x] **1.2** `lib/google-sheets/read.ts` — `readTab`: lettura completa tab via `values.get`,
       mapping header→campi per nome colonna (non per posizione), inclusa colonna Tag Source
 - [ ] **1.3** `lib/google-sheets/write.ts` — `batchUpdateCells`: scrittura mirata di celle singole
       via `values.batchUpdate` (mai riga intera, mai colonna Indirect)
