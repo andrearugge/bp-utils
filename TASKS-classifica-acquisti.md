@@ -55,7 +55,7 @@ Vincoli fissi:
       mapping header→campi per nome colonna (non per posizione), inclusa colonna Tag Source
 - [x] **1.3** `lib/google-sheets/write.ts` — `batchUpdateCells`: scrittura mirata di celle singole
       via `values.batchUpdate` (mai riga intera, mai colonna Indirect)
-- [ ] **1.4** `lib/google-sheets/log.ts` — gestione tab "Classifier Log": creazione se assente
+- [x] **1.4** `lib/google-sheets/log.ts` — gestione tab "Classifier Log": creazione se assente
       (`batchUpdate` + `addSheet`), append righe di log
 - [ ] **1.5** Verifica manuale su un Google Sheet di test: read → write cella → log
 
