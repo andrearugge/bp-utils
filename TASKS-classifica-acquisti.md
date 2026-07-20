@@ -92,7 +92,7 @@ Vincoli fissi:
 
 - [x] **4.1** `lib/classifica-acquisti/loo.ts` — leave-one-out come modulo runtime (riusa il core
       della Fase 0): mismatch su righe verificate → candidati "possibile errore" con motivazione
-- [ ] **4.2** `lib/classifica-acquisti/stats.ts` — controlli statistici: importo fuori range
+- [x] **4.2** `lib/classifica-acquisti/stats.ts` — controlli statistici: importo fuori range
       tipico per fornitore (IQR), fornitore con tag incoerenti senza regola che lo giustifichi,
       combinazioni Categoria×Centro costo mai viste nel ground truth
 - [ ] **4.3** Output unificato `Anomalia[]` (riga, tipo check, motivazione, severità)
