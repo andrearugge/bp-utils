@@ -2,9 +2,9 @@
 
 // Vista "Da classificare" (task 5.2): righe non taggate con suggerimento,
 // confidence, metodo ed evidenza; azioni accetta/modifica/scarta e selezione
-// multipla per l'accettazione in blocco delle confidence alte. La scrittura
-// effettiva sul foglio (task 5.3) è in fondo a questo stesso file: le due cose
-// sono la stessa vista, solo task numerati separatamente nel piano.
+// multipla (anche per livello di confidence) per l'accettazione in blocco. La
+// scrittura effettiva sul foglio (task 5.3) è in fondo a questo stesso file:
+// le due cose sono la stessa vista, solo task numerati separatamente nel piano.
 
 import { useEffect, useState } from "react";
 import {
@@ -27,6 +27,14 @@ const LOG_TAB_NAME = "Classifier Log";
 const LOG_HEADER = [
   "Timestamp", "Riga", "Fornitore", "Descrizione", "Valori proposti", "Metodo", "Score", "Evidenza", "Esito",
 ];
+/** Righe per chiamata a /api/classify: sotto il limite del server (100), per lasciare margine ai token. */
+const LLM_CHUNK_SIZE = 50;
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
 
 /** Riga finalizzata dall'utente, in attesa di scrittura sul foglio. */
 interface RigaClassificata {
@@ -110,57 +118,82 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
   }, [rows, lookup]);
 
   const righeVisibili = rows.filter((r) => !coda.has(r.rowIndex));
-  const senzaSuggerimento = righeVisibili.filter((r) => suggerimenti.get(r.rowIndex) == null);
+  // Da validare via LLM: righe senza alcun match storico E righe con confidence
+  // "bassa" (per definizione insufficiente per l'accettazione automatica).
+  const daValidareLlm = righeVisibili.filter((r) => {
+    const s = suggerimenti.get(r.rowIndex);
+    return s == null || s.livello === "bassa";
+  });
+
+  const conteggioPerLivello = { alta: 0, media: 0, bassa: 0 } as Record<"alta" | "media" | "bassa", number>;
+  for (const r of righeVisibili) {
+    const liv = suggerimenti.get(r.rowIndex)?.livello;
+    if (liv) conteggioPerLivello[liv]++;
+  }
 
   function rigaByIndex(rowIndex: number): AcquistoRow | undefined {
     return rows.find((r) => r.rowIndex === rowIndex);
   }
 
   async function handleRichiediLlm() {
-    if (senzaSuggerimento.length === 0) return;
+    if (daValidareLlm.length === 0) return;
     setLlmLoading(true);
     setLlmMsg(null);
-    try {
-      const payload = {
-        rows: senzaSuggerimento.map((r) => ({
-          rowIndex: r.rowIndex,
-          data: r.data,
-          fornitore: r.fornitore,
-          descrizione: r.descrizione,
-          imponibile: r.imponibile,
-          topMatches: topFuzzyMatches(r, lookup),
-        })),
-      };
-      const res = await fetch("/api/classify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? `Errore ${res.status}`);
 
-      setSuggerimenti((prev) => {
-        const next = new Map(prev);
-        for (const r of data.risultati as { rowIndex: number; valori: Classificazione; motivazione: string }[]) {
-          next.set(r.rowIndex, {
+    const batches = chunk(daValidareLlm, LLM_CHUNK_SIZE);
+    let totaleRicevuti = 0;
+    let errore: string | null = null;
+
+    for (let i = 0; i < batches.length; i++) {
+      if (batches.length > 1) setLlmMsg(`Richiesta batch ${i + 1}/${batches.length}…`);
+      try {
+        const payload = {
+          rows: batches[i].map((r) => ({
             rowIndex: r.rowIndex,
-            valori: r.valori,
-            score: 0.3,
-            livello: "bassa",
-            metodo: "llm",
-            evidenza: r.motivazione,
-            similarita: 0,
-            occorrenze: 0,
-          });
-        }
-        return next;
-      });
-      setLlmMsg(`Suggerimenti LLM ricevuti per ${data.risultati.length} righe.`);
-    } catch (err) {
-      setLlmMsg(err instanceof Error ? err.message : "Errore nella richiesta LLM.");
-    } finally {
-      setLlmLoading(false);
+            data: r.data,
+            fornitore: r.fornitore,
+            descrizione: r.descrizione,
+            imponibile: r.imponibile,
+            topMatches: topFuzzyMatches(r, lookup),
+          })),
+        };
+        const res = await fetch("/api/classify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? `Errore ${res.status}`);
+
+        setSuggerimenti((prev) => {
+          const next = new Map(prev);
+          for (const r of data.risultati as { rowIndex: number; valori: Classificazione; motivazione: string }[]) {
+            next.set(r.rowIndex, {
+              rowIndex: r.rowIndex,
+              valori: r.valori,
+              score: 0.3,
+              livello: "bassa",
+              metodo: "llm",
+              evidenza: r.motivazione,
+              similarita: 0,
+              occorrenze: 0,
+            });
+          }
+          return next;
+        });
+        totaleRicevuti += data.risultati.length;
+      } catch (err) {
+        errore = err instanceof Error ? err.message : "Errore nella richiesta LLM.";
+        break;
+      }
     }
+
+    setLlmMsg(
+      errore
+        ? `${errore} (ricevuti ${totaleRicevuti}/${daValidareLlm.length} prima dell'errore)`
+        : `Suggerimenti LLM ricevuti per ${totaleRicevuti} righe.`,
+    );
+    setLlmLoading(false);
   }
 
   function stageRiga(
@@ -216,7 +249,7 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
   function handleAccettaSelezionate() {
     for (const rowIndex of selezionate) {
       const s = suggerimenti.get(rowIndex);
-      if (s?.livello === "alta") stageRiga(rowIndex, s.valori, "auto", s.metodo, s.score, s.evidenza);
+      if (s) stageRiga(rowIndex, s.valori, "auto", s.metodo, s.score, s.evidenza);
     }
   }
 
@@ -227,6 +260,21 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
       else next.add(rowIndex);
       return next;
     });
+  }
+
+  /** Selezione veloce: aggiunge tutte le righe visibili con questo livello di confidence. */
+  function selezionaLivello(livello: "alta" | "media" | "bassa") {
+    setSelezionate((prev) => {
+      const next = new Set(prev);
+      for (const r of righeVisibili) {
+        if (suggerimenti.get(r.rowIndex)?.livello === livello) next.add(r.rowIndex);
+      }
+      return next;
+    });
+  }
+
+  function deselezionaTutto() {
+    setSelezionate(new Set());
   }
 
   async function handleScriviConferme() {
@@ -282,16 +330,32 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <Btn onClick={handleRichiediLlm} disabled={senzaSuggerimento.length === 0 || llmLoading}>
-          {llmLoading ? "Richiesta in corso…" : `Richiedi suggerimenti LLM (${senzaSuggerimento.length})`}
-        </Btn>
-        <Btn onClick={handleAccettaSelezionate} disabled={selezionate.size === 0} variant="ghost">
-          Accetta selezionate ({selezionate.size})
+        <Btn onClick={handleRichiediLlm} disabled={daValidareLlm.length === 0 || llmLoading}>
+          {llmLoading ? "Richiesta in corso…" : `Richiedi suggerimenti LLM (${daValidareLlm.length})`}
         </Btn>
         <Btn onClick={handleScriviConferme} disabled={coda.size === 0 || writing}>
           {writing ? "Scrittura…" : `Scrivi ${coda.size} conferme sul foglio`}
         </Btn>
         {coda.size > 0 && <span style={{ fontSize: 12, color: "#6b6b70" }}>{coda.size} in coda</span>}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 12 }}>
+        <span style={{ color: "#6b6b70" }}>Seleziona:</span>
+        <Btn onClick={() => selezionaLivello("alta")} disabled={conteggioPerLivello.alta === 0} variant="ghost">
+          Alta ({conteggioPerLivello.alta})
+        </Btn>
+        <Btn onClick={() => selezionaLivello("media")} disabled={conteggioPerLivello.media === 0} variant="ghost">
+          Media ({conteggioPerLivello.media})
+        </Btn>
+        <Btn onClick={() => selezionaLivello("bassa")} disabled={conteggioPerLivello.bassa === 0} variant="ghost">
+          Bassa ({conteggioPerLivello.bassa})
+        </Btn>
+        <Btn onClick={deselezionaTutto} disabled={selezionate.size === 0} variant="ghost">
+          Nessuna
+        </Btn>
+        <Btn onClick={handleAccettaSelezionate} disabled={selezionate.size === 0}>
+          Accetta selezionate ({selezionate.size})
+        </Btn>
       </div>
       {llmMsg && <p style={{ margin: 0, fontSize: 12, color: "#9b9ba0" }}>{llmMsg}</p>}
       {writeMsg && <p style={{ margin: 0, fontSize: 12, color: "#9b9ba0" }}>{writeMsg}</p>}
@@ -304,7 +368,7 @@ export default function DaClassificare({ token, sheetId, tabName, tab, rows, loo
             <div key={row.rowIndex} style={{ border: "1px solid #2a2a30", borderRadius: 8, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                 <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  {s?.livello === "alta" && (
+                  {s && (
                     <input
                       type="checkbox"
                       checked={selezionate.has(row.rowIndex)}
