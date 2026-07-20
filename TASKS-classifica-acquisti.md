@@ -38,7 +38,7 @@ Vincoli fissi:
 - [x] **0.6** `lib/classifica-acquisti/confidence.ts` — confidence evidence-based: composizione di
       similarità match, n. occorrenze, consistenza storica delle etichette, accordo tra metodi.
       Soglie: `alta` (auto-proponibile) / `media` (rivedere) / `bassa` (→ fallback LLM)
-- [ ] **0.7** `scripts/cross-validate.ts` — harness leave-one-out eseguibile offline (`npx tsx`):
+- [x] **0.7** `scripts/cross-validate.ts` — harness leave-one-out eseguibile offline (`npx tsx`):
       per ogni riga taggata, predici usando solo le altre; metriche di accuratezza per asse
       (Centro costo, Categoria, Type, Direct) + lista mismatch con motivazione
 - [ ] **0.8** Taratura su dati reali: eseguire LOO sul CSV, tarare pesi/soglie, produrre report
