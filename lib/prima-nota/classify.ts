@@ -145,11 +145,31 @@ function extractMonth(rawDesc: string): string {
 }
 
 /**
+ * Ricava l'insieme dei cognomi amministratore a partire dai sottoconti
+ * inequivocabili del file ("compenso amministratore X", "indennità di
+ * trasferta amministratore X"). Usato per distinguere, nelle righe
+ * "Contributi INPS X", se X è l'amministratore o un dipendente — invece
+ * di assumerlo.
+ */
+export function collectAdminSurnames(sottocontoList: string[]): Set<string> {
+  const surnames = new Set<string>();
+  for (const sottoconto of sottocontoList) {
+    const sub = sottoconto.toLowerCase();
+    const m1 = sub.match(/compenso amministratore\s+(\S+)/i);
+    if (m1) surnames.add(m1[1]);
+    const m2 = sub.match(/indennità di trasferta amministratore\s+(\S+)/i);
+    if (m2) surnames.add(m2[1]);
+  }
+  return surnames;
+}
+
+/**
  * Deduce fornitore e descrizione pulita per una riga della prima nota.
  */
 export function buildOutput(
   rawDesc: string,
-  sottoconto: string
+  sottoconto: string,
+  adminSurnames: Set<string> = new Set()
 ): { fornitore: string; descrizione: string } {
   const raw = rawDesc.toLowerCase();
   const sub = sottoconto.toLowerCase();
@@ -176,25 +196,25 @@ export function buildOutput(
   const hasContributiInps =
     sub.includes("contributi inps") || sub.includes("constributi inps");
   if (hasContributiInps) {
-    // Try to extract a cognome (admin) vs generic (dipendenti)
+    // Cognome dopo "contributi inps" (se presente)
     const m = sottoconto.match(/c[o]?n[s]?tributi inps\s+(\S+)/i);
     const afterKeyword = m ? m[1].toLowerCase() : "";
-    const isAdmin =
-      afterKeyword &&
-      afterKeyword !== "dipendenti" &&
-      afterKeyword !== "apprendista";
+    const isGenerico =
+      !afterKeyword || afterKeyword === "dipendenti" || afterKeyword === "apprendista";
+    // Amministratore SOLO se il cognome compare altrove nel file come
+    // "compenso amministratore X" — mai per assunzione.
+    const isAdmin = !isGenerico && adminSurnames.has(afterKeyword);
     const mese = extractMonth(rawDesc);
     if (isAdmin) {
       return {
         fornitore: m![1],
         descrizione: `Contributi INPS amministratore${mese ? " - " + mese : ""}`,
       };
-    } else {
-      return {
-        fornitore: "",
-        descrizione: `Contributi INPS dipendenti${mese ? " - " + mese : ""}`,
-      };
     }
+    return {
+      fornitore: isGenerico ? "" : m![1],
+      descrizione: `Contributi INPS dipendenti${mese ? " - " + mese : ""}`,
+    };
   }
 
   // ── 2. Stipendi dipendenti ────────────────────────────────────────────────

@@ -10,14 +10,13 @@ export function generatePrimaNotaCsv(rows: PrimaNotaRow[], soloInserisci: boolea
       ? `"${v.replace(/"/g, '""')}"`
       : v;
   };
-  const toItalianDecimal = (v: string) => v.replace(".", ",");
   const header = [
     ...BP_HEADER,
     ...(soloInserisci ? [] : ["Azione"]),
   ].map(escape).join(";");
   const lines = filtered.map(r =>
     [
-      r.data, "", "", "", "", "", r.fornitore, r.descrizione, toItalianDecimal(r.importo),
+      r.data, "", "", "", "", "", r.fornitore, r.descrizione, r.importo,
       ...(soloInserisci ? [] : [r.azione]),
     ].map(escape).join(";")
   );

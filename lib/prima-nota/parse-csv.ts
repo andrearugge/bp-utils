@@ -1,7 +1,53 @@
 import { PrimaNotaRow } from "./types";
-import { classify, buildOutput } from "./classify";
+import { classify, buildOutput, collectAdminSurnames } from "./classify";
 
 // ─── CSV parser ──────────────────────────────────────────────────────────────
+
+// ─── Parsing importi ─────────────────────────────────────────────────────────
+
+/**
+ * Analizza un importo testuale in un numero, indipendentemente dal formato
+ * di provenienza: simbolo di valuta, separatore delle migliaia e decimale
+ * in stile italiano (1.054,89) o anglosassone (1,054.89), con o senza
+ * separatore delle migliaia. Es: "€ 1,054.89" / "1.054,89" / "1054.89" → 1054.89
+ */
+function parseImporto(raw: string): number {
+  let s = raw.trim().replace(/[^0-9,.\-()]/g, "");
+  if (!s) return NaN;
+
+  const negative = s.includes("-") || (s.startsWith("(") && s.endsWith(")"));
+  s = s.replace(/[()\-]/g, "");
+
+  const lastComma = s.lastIndexOf(",");
+  const lastDot = s.lastIndexOf(".");
+
+  if (lastComma !== -1 && lastDot !== -1) {
+    // Presenti entrambi: il più a destra è il separatore decimale, l'altro le migliaia
+    s = lastComma > lastDot
+      ? s.replace(/\./g, "").replace(",", ".")
+      : s.replace(/,/g, "");
+  } else if (lastComma !== -1) {
+    // Solo virgola: decimale se seguita da 1-2 cifre, altrimenti migliaia
+    const decimals = s.length - lastComma - 1;
+    s = decimals <= 2 ? s.replace(",", ".") : s.replace(/,/g, "");
+  } else if (lastDot !== -1) {
+    const decimals = s.length - lastDot - 1;
+    if (decimals > 2) s = s.replace(/\./g, "");
+  }
+
+  const n = parseFloat(s);
+  return negative ? -Math.abs(n) : n;
+}
+
+/** Riformatta un importo in formato italiano pulito (virgola decimale, senza separatore delle migliaia) */
+function formatImportoItaliano(n: number): string {
+  if (Number.isNaN(n)) return "";
+  return n.toLocaleString("it-IT", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: false,
+  });
+}
 
 function detectSeparator(firstLine: string): "," | ";" {
   const commas = (firstLine.match(/,/g) ?? []).length;
@@ -128,6 +174,12 @@ export function parsePrimaNotaCsv(text: string): ParseResult {
     };
   }
 
+  // Primo passaggio: individua i cognomi amministratore dai sottoconti
+  // inequivocabili del file, per disambiguare le righe "Contributi INPS X".
+  const adminSurnames = collectAdminSurnames(
+    allRows.slice(1).map((row) => (colSottoconto !== -1 ? (row[colSottoconto] ?? "") : ""))
+  );
+
   const rows: PrimaNotaRow[] = [];
   let skippedCount = 0;
 
@@ -143,11 +195,12 @@ export function parsePrimaNotaCsv(text: string): ParseResult {
     }
 
     const data = colData !== -1 ? (row[colData] ?? "") : "";
-    const importo = colImporto !== -1 ? (row[colImporto] ?? "") : "";
+    const importoRaw = colImporto !== -1 ? (row[colImporto] ?? "") : "";
+    const importo = importoRaw ? formatImportoItaliano(parseImporto(importoRaw)) : "";
     const causale = colCausale !== -1 ? (row[colCausale] ?? "") : "";
 
     const { azione, motivo } = classify(rawDesc, sottoconto);
-    const { fornitore, descrizione } = buildOutput(rawDesc, sottoconto);
+    const { fornitore, descrizione } = buildOutput(rawDesc, sottoconto, adminSurnames);
 
     rows.push({
       idx: i - 1, // 0-based index among data rows
