@@ -31,7 +31,7 @@ Vincoli fissi:
       spazi multipli, entità HTML
 - [x] **0.4** `lib/classifica-acquisti/fuzzy.ts` — similarità fornitore: match esatto normalizzato →
       token-set overlap + edit distance (implementazione in-house, no dipendenze), score 0–1
-- [ ] **0.5** `lib/classifica-acquisti/match.ts` — lookup storico: raggruppa ground truth per
+- [x] **0.5** `lib/classifica-acquisti/match.ts` — lookup storico: raggruppa ground truth per
       fornitore normalizzato, voto di maggioranza **pesato per recency** (decadimento esponenziale
       sulla data), regole deterministiche a valle (Leasing & Noleggi → Material;
       Cross BL → Direct 0; Direct+Indirect coerenti)
