@@ -1,48 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { EXTRACTION_PROMPT } from "@/lib/prompt";
+import { fetchWithRetry } from "@/lib/anthropic/fetch-with-retry";
 
 export const maxDuration = 60;
-
-const MAX_RETRIES = 5;
-const BASE_DELAY_MS = 1000;
-
-async function fetchWithRetry(
-  url: string,
-  options: RequestInit
-): Promise<Response> {
-  let lastResponse: Response | null = null;
-
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    if (attempt > 0) {
-      // Use Retry-After header from the previous response if available, else exponential backoff
-      let delay = BASE_DELAY_MS * Math.pow(2, attempt - 1); // 1s, 2s, 4s, 8s, 16s
-      const retryAfter = lastResponse?.headers.get("retry-after");
-      if (retryAfter) {
-        const fromHeader = parseFloat(retryAfter) * 1000;
-        if (fromHeader > 0 && fromHeader < 60000) delay = fromHeader;
-      }
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-
-    let response: Response;
-    try {
-      response = await fetch(url, options);
-    } catch (err) {
-      if (attempt === MAX_RETRIES) throw err;
-      lastResponse = null;
-      continue;
-    }
-
-    if (response.status === 429 || response.status === 529) {
-      lastResponse = response;
-      continue;
-    }
-
-    return response;
-  }
-
-  return lastResponse!;
-}
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;

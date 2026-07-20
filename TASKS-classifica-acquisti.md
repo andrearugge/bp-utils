@@ -75,13 +75,13 @@ Vincoli fissi:
 
 ## Fase 3 — Fallback LLM con structured output
 
-- [ ] **3.1** Leggere `node_modules/next/dist/docs/` per le convenzioni route handler di questa
+- [x] **3.1** Leggere `node_modules/next/dist/docs/` per le convenzioni route handler di questa
       versione di Next.js
 - [ ] **3.2** `app/api/classify/route.ts` — POST: batch di righe senza match affidabile →
       Claude con **tool use + JSON schema forzato** (un tool `classify_rows`, output validato),
       modello recente (Sonnet 5), **prompt caching** sul blocco statico
       (tassonomia + istruzioni + esempi)
-- [ ] **3.3** Riusare/estrarre `fetchWithRetry` da `app/api/extract/route.ts` in util condivisa
+- [x] **3.3** Riusare/estrarre `fetchWithRetry` da `app/api/extract/route.ts` in util condivisa
 - [ ] **3.4** Nel prompt: passare per ogni riga i top match fuzzy come contesto (l'LLM decide
       con lo storico sotto gli occhi, non alla cieca)
 - [ ] **3.5** Test manuale con le righe di giugno realmente prive di storico

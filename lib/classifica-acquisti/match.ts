@@ -78,7 +78,7 @@ function comboKey(c: Classificazione): string {
  * Vota le combinazioni di una lista di righe storiche. Ritorna la combinazione
  * vincente, il consenso complessivo e per asse.
  */
-function vota(voti: Voto[]): {
+export function vota(voti: Voto[]): {
   valori: Classificazione;
   consenso: number;
   consensoPerAsse: Record<Asse, number>;
@@ -195,4 +195,42 @@ export function matchRow(
     consensoPerAsse: esito.consensoPerAsse,
     regoleApplicate,
   };
+}
+
+export interface TopMatch {
+  chiave: string;
+  similarita: number;
+  occorrenze: number;
+  /** Combinazione più votata tra le righe storiche di questa chiave (maggioranza semplice). */
+  valori: Classificazione;
+}
+
+/**
+ * Top N chiavi storiche più simili a una riga, come contesto per il fallback LLM
+ * (task 3.4): a differenza di `matchRow`, non fonde i candidati in un'unica
+ * decisione — mostra le alternative distinte così l'LLM può scegliere quella
+ * pertinente (es. "Google Ads" vicino sia a "Google Ireland" che a "Google Cloud Italy").
+ */
+export function topFuzzyMatches(
+  row: AcquistoRow,
+  lookup: Lookup,
+  n = 3,
+  minSimilarity = 0.4,
+): TopMatch[] {
+  const key = lookupKey(row.fornitore, row.descrizione);
+  if (key === "") return [];
+
+  const candidati: TopMatch[] = [];
+  for (const [k, righe] of lookup) {
+    const sim = k === key ? 1 : similarity(key, k);
+    if (sim < minSimilarity) continue;
+    const voti: Voto[] = righe.map((r) => ({
+      valori: { centroCosto: r.centroCosto, categoria: r.categoria, type: r.type, direct: r.direct },
+      peso: 1,
+    }));
+    candidati.push({ chiave: k, similarita: sim, occorrenze: righe.length, valori: vota(voti).valori });
+  }
+
+  candidati.sort((a, b) => b.similarita - a.similarita || b.occorrenze - a.occorrenze);
+  return candidati.slice(0, n);
 }
