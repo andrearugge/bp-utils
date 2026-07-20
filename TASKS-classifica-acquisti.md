@@ -65,7 +65,7 @@ Vincoli fissi:
 
 - [x] **2.1** `lib/classifica-acquisti/ground-truth.ts` — filtro righe ground truth:
       solo `Tag Source ∈ {manual, confirmed}`; righe `auto` e vuote escluse dal lookup
-- [ ] **2.2** Backfill una-tantum della colonna Tag Source sul foglio: righe taggate fino a
+- [x] **2.2** Backfill una-tantum della colonna Tag Source sul foglio: righe taggate fino a
       mag 2026 → `manual` (validate a mano, colori già puliti); proposta batch con conferma
       utente prima della scrittura
 - [x] **2.3** Gestire nel backfill le 2 righe con Direct vuoto e la riga di maggio non taggata
