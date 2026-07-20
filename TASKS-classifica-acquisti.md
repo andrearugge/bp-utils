@@ -90,7 +90,7 @@ Vincoli fissi:
 
 ## Fase 4 — Error detection
 
-- [ ] **4.1** `lib/classifica-acquisti/loo.ts` — leave-one-out come modulo runtime (riusa il core
+- [x] **4.1** `lib/classifica-acquisti/loo.ts` — leave-one-out come modulo runtime (riusa il core
       della Fase 0): mismatch su righe verificate → candidati "possibile errore" con motivazione
 - [ ] **4.2** `lib/classifica-acquisti/stats.ts` — controlli statistici: importo fuori range
       tipico per fornitore (IQR), fornitore con tag incoerenti senza regola che lo giustifichi,
