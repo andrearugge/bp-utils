@@ -15,8 +15,12 @@ export interface ConfidenceOptions {
   occorrenzePiene: number;
 }
 
+// Tarate con LOO sul CSV di riferimento (task 0.8): con sogliaAlta 0.85 il
+// livello "alta" richiede di fatto ≥3 occorrenze storiche concordi e ha
+// precisione 99.8%; la fascia 0.5–0.85 (1–2 occorrenze unanimi o storico
+// conteso) si ferma a "media"; sotto 0.5 la precisione crolla → "bassa".
 export const DEFAULT_CONFIDENCE_OPTIONS: ConfidenceOptions = {
-  sogliaAlta: 0.75,
+  sogliaAlta: 0.85,
   sogliaMedia: 0.5,
   occorrenzePiene: 3,
 };

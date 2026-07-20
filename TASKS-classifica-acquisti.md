@@ -41,7 +41,7 @@ Vincoli fissi:
 - [x] **0.7** `scripts/cross-validate.ts` — harness leave-one-out eseguibile offline (`npx tsx`):
       per ogni riga taggata, predici usando solo le altre; metriche di accuratezza per asse
       (Centro costo, Categoria, Type, Direct) + lista mismatch con motivazione
-- [ ] **0.8** Taratura su dati reali: eseguire LOO sul CSV, tarare pesi/soglie, produrre report
+- [x] **0.8** Taratura su dati reali: eseguire LOO sul CSV, tarare pesi/soglie, produrre report
       accuratezza — **checkpoint con l'utente prima di proseguire** (decide anche se il fuzzy
       basta o servono alias curati per casi tipo Google Ads/Google Ireland)
 
