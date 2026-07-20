@@ -57,7 +57,7 @@ Vincoli fissi:
       via `values.batchUpdate` (mai riga intera, mai colonna Indirect)
 - [x] **1.4** `lib/google-sheets/log.ts` — gestione tab "Classifier Log": creazione se assente
       (`batchUpdate` + `addSheet`), append righe di log
-- [ ] **1.5** Verifica manuale su un Google Sheet di test: read → write cella → log
+- [x] **1.5** Verifica manuale su un Google Sheet di test: read → write cella → log
 
 ---
 
