@@ -26,7 +26,7 @@ Vincoli fissi:
       `Anomalia`, `TagSource`
 - [x] **0.2** `lib/classifica-acquisti/parse-csv.ts` — parser dell'export: date `dd/mm/yyyy`,
       importi `€ 1.234,56` → number, percentuali → 0|100, decode entità HTML, righe vuote/malformate
-- [ ] **0.3** `lib/classifica-acquisti/normalize.ts` — normalizzazione fornitore: lowercase, trim,
+- [x] **0.3** `lib/classifica-acquisti/normalize.ts` — normalizzazione fornitore: lowercase, trim,
       rimozione forme giuridiche (srl, spa, snc, sas, ltd, inc, sarl, gmbh…), punteggiatura,
       spazi multipli, entità HTML
 - [ ] **0.4** `lib/classifica-acquisti/fuzzy.ts` — similarità fornitore: match esatto normalizzato →
