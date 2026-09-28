@@ -157,6 +157,14 @@ export function parsePrimaNotaCsv(text: string): ParseResult {
     return { rows: [], skippedCount: 0, error: "Il file CSV è vuoto." };
   }
 
+  return classifyTable(allRows);
+}
+
+/**
+ * Classifica una tabella già letta (prima riga = intestazione), qualunque sia
+ * il formato di origine (CSV o Excel).
+ */
+export function classifyTable(allRows: string[][]): ParseResult {
   const headers = allRows[0];
 
   // Locate required columns
@@ -199,7 +207,7 @@ export function parsePrimaNotaCsv(text: string): ParseResult {
     const importo = importoRaw ? formatImportoItaliano(parseImporto(importoRaw)) : "";
     const causale = colCausale !== -1 ? (row[colCausale] ?? "") : "";
 
-    const { azione, motivo } = classify(rawDesc, sottoconto);
+    const { azione, motivo } = classify(rawDesc, sottoconto, importo);
     const { fornitore, descrizione } = buildOutput(rawDesc, sottoconto, adminSurnames);
 
     rows.push({

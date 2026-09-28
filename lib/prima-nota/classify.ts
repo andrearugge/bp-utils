@@ -2,14 +2,22 @@
 
 type Azione = "Inserisci" | "Escludi" | "Verifica";
 
+/** Motivo assegnato alle righe con sottoconto non in elenco, inserite di default. */
+export const MOTIVO_DEFAULT = "Sottoconto non riconosciuto → inserito di default, controlla";
+
 /**
  * Classifica una riga della prima nota in base al sottoconto e alla descrizione.
  * Le regole ESCLUDI vengono controllate prima delle INSERISCI.
  * La prima regola che matcha vince.
+ *
+ * Il file della commercialista contiene righe in dare, quindi di norma costi:
+ * un sottoconto sconosciuto viene inserito di default (segnalato con
+ * MOTIVO_DEFAULT) invece di sparire. Resta "Verifica" solo se manca l'importo.
  */
 export function classify(
   rawDesc: string,
-  sottoconto: string
+  sottoconto: string,
+  importo = ""
 ): { azione: Azione; motivo: string } {
   const raw = rawDesc.toLowerCase();
   const sub = sottoconto.toLowerCase();
@@ -38,6 +46,8 @@ export function classify(
     return { azione: "Escludi", motivo: "Ravvedimento fiscale → non operativo" };
   if (sub.includes("ricavi prestazioni"))
     return { azione: "Escludi", motivo: "Questo è un RICAVO, non un costo" };
+  if (sub.includes("riserva") || /\butili\b/.test(sub))
+    return { azione: "Escludi", motivo: "Movimento di patrimonio netto (riserve/utili) → non è un costo" };
   // ESCLUDI — check su rawDesc
   if (raw.includes("deposito cauzionale"))
     return { azione: "Escludi", motivo: "Voce patrimoniale, non è un costo" };
@@ -54,10 +64,13 @@ export function classify(
     return { azione: "Inserisci", motivo: "Contributi previdenziali" };
   if (sub.includes("constributi inps"))
     return { azione: "Inserisci", motivo: "Contributi previdenziali (typo nel gestionale)" };
-  if (sub.includes("salari e stipendi"))
-    return { azione: "Inserisci", motivo: "Costo del personale" };
+  if (sub.includes("tirocin"))
+    return { azione: "Inserisci", motivo: "Costo del personale (tirocinante)" };
   if (sub.includes("stipendi apprendista"))
     return { azione: "Inserisci", motivo: "Costo del personale (apprendista)" };
+  // "salari e stipendi", "stipendi COGNOME", "stipendio X", "retribuzioni"…
+  if (/stipend|salari|retribuz/.test(sub))
+    return { azione: "Inserisci", motivo: "Costo del personale" };
   if (sub.includes("locazione ufficio"))
     return { azione: "Inserisci", motivo: "Affitto ufficio" };
   if (sub.includes("spese condominiali"))
@@ -72,6 +85,10 @@ export function classify(
     return { azione: "Inserisci", motivo: "Quote associative" };
   if (sub.includes("imposta di bollo"))
     return { azione: "Inserisci", motivo: "Imposta di bollo" };
+  if (sub.includes("imposta di registro"))
+    return { azione: "Inserisci", motivo: "Imposta di registro" };
+  if (sub.includes("arrotondamenti passivi"))
+    return { azione: "Inserisci", motivo: "Arrotondamenti passivi" };
   if (sub.includes("sanzioni, multe"))
     return { azione: "Inserisci", motivo: "Sanzioni e multe" };
   if (sub.includes("costi prestazioni software"))
@@ -91,7 +108,9 @@ export function classify(
     return { azione: "Inserisci", motivo: "Prestazione occasionale" };
 
   // ── FALLBACK ──────────────────────────────────────────────────────────────
-  return { azione: "Verifica", motivo: "Da verificare manualmente" };
+  if (!importo.trim())
+    return { azione: "Verifica", motivo: "Importo in dare mancante → da verificare manualmente" };
+  return { azione: "Inserisci", motivo: MOTIVO_DEFAULT };
 }
 
 // ─── Tabella servizi noti ─────────────────────────────────────────────────────
@@ -144,6 +163,12 @@ function extractMonth(rawDesc: string): string {
   return "";
 }
 
+/** "Rilevazione stipendi AGOSTO TIROCINANTE MAZZIERI" → "Mazzieri" */
+function extractTirocinante(rawDesc: string): string {
+  const m = rawDesc.match(/tirocinante\s+(\S+)/i);
+  return m ? toTitleCase(m[1]) : "";
+}
+
 /**
  * Ricava l'insieme dei cognomi amministratore a partire dai sottoconti
  * inequivocabili del file ("compenso amministratore X", "indennità di
@@ -185,7 +210,7 @@ export function buildOutput(
     };
   }
   if (sub.includes("indennità di trasferta")) {
-    const m = sottoconto.match(/indennità di trasferta\s+(\S+)/i);
+    const m = sottoconto.match(/indennità di trasferta\s+(?:amministratore\s+)?(\S+)/i);
     const cognome = m ? m[1] : "";
     const mese = extractMonth(rawDesc);
     return {
@@ -211,6 +236,13 @@ export function buildOutput(
         descrizione: `Contributi INPS amministratore${mese ? " - " + mese : ""}`,
       };
     }
+    const tirocinante = extractTirocinante(rawDesc);
+    if (isGenerico && tirocinante) {
+      return {
+        fornitore: tirocinante,
+        descrizione: `Contributi INPS tirocinante${mese ? " - " + mese : ""}`,
+      };
+    }
     return {
       fornitore: isGenerico ? "" : m![1],
       descrizione: `Contributi INPS dipendenti${mese ? " - " + mese : ""}`,
@@ -218,6 +250,13 @@ export function buildOutput(
   }
 
   // ── 2. Stipendi dipendenti ────────────────────────────────────────────────
+  if (sub.includes("tirocin")) {
+    const mese = extractMonth(rawDesc);
+    return {
+      fornitore: extractTirocinante(rawDesc),
+      descrizione: `Stipendio tirocinante${mese ? " - " + mese : ""}`,
+    };
+  }
   if (sub.includes("salari e stipendi")) {
     const mese = extractMonth(rawDesc);
     return {
@@ -230,6 +269,15 @@ export function buildOutput(
     return {
       fornitore: "",
       descrizione: `Stipendio apprendista${mese ? " - " + mese : ""}`,
+    };
+  }
+  // "stipendi BORTOLOTTI", "stipendio ROSSI" → stipendio del singolo dipendente
+  const stipendioMatch = sottoconto.match(/stipendi[oi]?\s+(\S+)/i);
+  if (stipendioMatch || /retribuz/.test(sub)) {
+    const mese = extractMonth(rawDesc);
+    return {
+      fornitore: stipendioMatch ? toTitleCase(stipendioMatch[1]) : "",
+      descrizione: `Stipendio dipendente${mese ? " - " + mese : ""}`,
     };
   }
 

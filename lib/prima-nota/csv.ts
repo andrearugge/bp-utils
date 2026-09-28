@@ -29,7 +29,7 @@ export function downloadPrimaNotaCsv(rows: PrimaNotaRow[], soloInserisci: boolea
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  const base = originalFileName.replace(/\.csv$/i, "");
+  const base = originalFileName.replace(/\.(csv|xlsx|xls)$/i, "");
   a.download = `${base}_BP${soloInserisci ? "_inserisci" : "_completo"}.csv`;
   a.style.display = "none";
   document.body.appendChild(a);

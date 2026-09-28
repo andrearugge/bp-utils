@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import { parsePrimaNotaCsv } from "@/lib/prima-nota/parse-csv";
+import { parsePrimaNotaXls } from "@/lib/prima-nota/parse-xls";
 import { PrimaNotaRow } from "@/lib/prima-nota/types";
 
 const SAMPLE_CSV =
@@ -42,15 +43,18 @@ export function CsvUpload({ onClassified }: CsvUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function processFile(file: File) {
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      setError("Seleziona un file .csv");
+    const name = file.name.toLowerCase();
+    const isExcel = name.endsWith(".xlsx") || name.endsWith(".xls");
+    if (!isExcel && !name.endsWith(".csv")) {
+      setError("Seleziona un file .csv, .xlsx o .xls");
       return;
     }
     setError(null);
     setIsParsing(true);
     try {
-      const text = await file.text();
-      const result = parsePrimaNotaCsv(text);
+      const result = isExcel
+        ? parsePrimaNotaXls(await file.arrayBuffer())
+        : parsePrimaNotaCsv(await file.text());
       if (result.error) {
         setError(result.error);
       } else {
@@ -110,14 +114,14 @@ export function CsvUpload({ onClassified }: CsvUploadProps) {
           }
         </p>
         <p style={{ margin: 0, color: "#6b6b70", fontSize: 13 }}>
-          Solo file .csv — un file alla volta
+          File .xlsx, .xls o .csv — un file alla volta
         </p>
       </div>
 
       <input
         ref={inputRef}
         type="file"
-        accept=".csv"
+        accept=".csv,.xlsx,.xls"
         style={{ display: "none" }}
         onChange={handleChange}
       />
@@ -177,7 +181,8 @@ export function CsvUpload({ onClassified }: CsvUploadProps) {
           </button>
         </div>
         <p style={{ margin: "0 0 10px", color: "#6b6b70", fontSize: 12 }}>
-          File <code style={{ color: "#9ca3af" }}>.csv</code> con separatore{" "}
+          File Excel della commercialista (<code style={{ color: "#9ca3af" }}>.xlsx</code>/<code style={{ color: "#9ca3af" }}>.xls</code>, primo foglio)
+          oppure <code style={{ color: "#9ca3af" }}>.csv</code> con separatore{" "}
           <code style={{ color: "#9ca3af" }}>;</code> o{" "}
           <code style={{ color: "#9ca3af" }}>,</code>. Colonne obbligatorie:
         </p>

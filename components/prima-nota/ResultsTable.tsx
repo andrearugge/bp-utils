@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { AzioneBadge } from "./AzioneBadge";
 import { PrimaNotaRow, AzioneFilter } from "@/lib/prima-nota/types";
+import { MOTIVO_DEFAULT } from "@/lib/prima-nota/classify";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -143,6 +144,15 @@ export function ResultsTable({
     Verifica: `Verifica (${counts.Verifica})`,
   };
 
+  // Righe inserite solo perché il sottoconto non è in elenco (e non ritoccate a mano)
+  const isDefault = (r: PrimaNotaRow) =>
+    r.motivo === MOTIVO_DEFAULT && editedAzioni[r.idx] === undefined;
+  const defaultCount = effective.filter(isDefault).length;
+
+  // Il CSV "solo Inserisci" scarterebbe in silenzio le righe da verificare:
+  // lo blocchiamo finché non sono state tutte decise.
+  const blockSoloInserisci = counts.Verifica > 0;
+
   const filtered =
     filter === "Tutti" ? effective : effective.filter((r) => r.azione === filter);
 
@@ -196,15 +206,17 @@ export function ResultsTable({
           </button>
           <button
             onClick={() => onDownload(true)}
+            disabled={blockSoloInserisci}
+            title={blockSoloInserisci ? "Decidi prima le righe da verificare" : undefined}
             style={{
-              background: "#059669",
+              background: blockSoloInserisci ? "#3b3b3f" : "#059669",
               border: "none",
               borderRadius: 6,
-              color: "#fff",
+              color: blockSoloInserisci ? "#9b9ba0" : "#fff",
               fontSize: 12,
               fontWeight: 600,
               padding: "5px 12px",
-              cursor: "pointer",
+              cursor: blockSoloInserisci ? "not-allowed" : "pointer",
               whiteSpace: "nowrap",
             }}
           >
@@ -227,6 +239,24 @@ export function ResultsTable({
             ↓ CSV completo
           </button>
         </div>
+
+        {(blockSoloInserisci || defaultCount > 0) && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12, fontSize: 12 }}>
+            {blockSoloInserisci && (
+              <button
+                onClick={() => onFilterChange("Verifica")}
+                style={{ background: "none", border: "none", padding: 0, textAlign: "left", color: "#d97706", cursor: "pointer", fontSize: 12 }}
+              >
+                ⚠ {counts.Verifica} {counts.Verifica === 1 ? "riga da verificare" : "righe da verificare"}: scegli Inserisci o Escludi prima di scaricare il CSV. Mostra →
+              </button>
+            )}
+            {defaultCount > 0 && (
+              <span style={{ color: "#9b9ba0" }}>
+                <span style={{ color: "#d97706" }}>●</span> {defaultCount} {defaultCount === 1 ? "riga inserita" : "righe inserite"} di default perché il sottoconto non è in elenco: controlla che siano costi.
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Filter pills */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
@@ -286,11 +316,14 @@ export function ResultsTable({
                 className="hover:!bg-white/5"
               >
                 {/* Azione badge — click to cycle */}
-                <TableCell>
+                <TableCell title={row.motivo}>
                   <AzioneBadge
                     azione={row.azione}
                     onClick={() => onAzioneChange(row.idx, AZIONE_CYCLE[row.azione])}
                   />
+                  {isDefault(row) && (
+                    <span style={{ color: "#d97706", fontSize: 10, marginLeft: 6 }}>●</span>
+                  )}
                 </TableCell>
 
                 {/* Data */}
