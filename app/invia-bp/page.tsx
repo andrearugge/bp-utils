@@ -1,11 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loadGis, requestToken } from "@/lib/invia-bp/auth";
-import { getTabHeaders, appendRows } from "@/lib/invia-bp/sheets";
+import { getTabHeaders, appendRows, listTabs } from "@/lib/invia-bp/sheets";
 import { parseCsv, ParsedCsv } from "@/lib/invia-bp/parse-csv";
 
 type Status = "idle" | "loading" | "ok" | "error";
+
+const DEFAULT_SHEET_ID = "1D4Gy0_pZXCpgQOvXa_Pjv8l6NUmJGsywWFTkfzsYStU";
 
 function Step({ n, label, active, done }: { n: number; label: string; active: boolean; done: boolean }) {
   return (
@@ -72,6 +74,29 @@ function TextInput({ value, onChange, placeholder, disabled }: {
   );
 }
 
+function Chip({ onClick, selected, disabled, children }: {
+  onClick: () => void; selected?: boolean; disabled?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        background: selected ? "rgba(245,158,11,0.15)" : "#111114",
+        border: `1px solid ${selected ? "#f59e0b" : "#2a2a30"}`,
+        borderRadius: 999,
+        color: selected ? "#f59e0b" : "#9b9ba0",
+        fontSize: 12, padding: "4px 10px",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.5 : 1,
+        maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function Notice({ type, children }: { type: "error" | "success" | "info"; children: React.ReactNode }) {
   const colors = {
     error:   { bg: "rgba(220,38,38,0.08)",  border: "rgba(220,38,38,0.2)",  text: "#dc2626" },
@@ -106,6 +131,7 @@ export default function InviaBpPage() {
 
   // Step 4 — Tab
   const [tabName, setTabName] = useState("");
+  const [tabsResult, setTabsResult] = useState<{ sheetId: string; tabs: string[]; error: string | null } | null>(null);
   const [sendStatus, setSendStatus] = useState<Status>("idle");
   const [sendMsg, setSendMsg] = useState<string | null>(null);
 
@@ -139,6 +165,32 @@ export default function InviaBpPage() {
     }
   }
 
+  // ── Step 4: load tab names of the selected sheet ──────────────────
+  const trimmedSheetId = sheetId.trim();
+  useEffect(() => {
+    if (!token || !trimmedSheetId) return;
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const titles = await listTabs(token, trimmedSheetId);
+        if (!cancelled) setTabsResult({ sheetId: trimmedSheetId, tabs: titles, error: null });
+      } catch (err) {
+        const error = err instanceof Error ? err.message : "Impossibile leggere le tab.";
+        if (!cancelled) setTabsResult({ sheetId: trimmedSheetId, tabs: [], error });
+      }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [token, trimmedSheetId]);
+
+  // Result only counts if it belongs to the sheet currently in the input
+  const currentTabs = tabsResult?.sheetId === trimmedSheetId ? tabsResult : null;
+  const tabsLoading = !!token && !!trimmedSheetId && !currentTabs;
+
+  function selectTab(name: string) {
+    setTabName(name); setSendStatus("idle"); setSendMsg(null);
+  }
+
   // ── Step 4: validate + send ───────────────────────────────────────
   async function handleSend() {
     if (!csv || !token || !sheetId.trim() || !tabName.trim()) return;
@@ -151,21 +203,26 @@ export default function InviaBpPage() {
       let rowsToSend = csv.rows;
       let effectiveSheetHeaders = sheetHeaders;
 
-      // If "Note Admin" is in the sheet but not in the CSV, pad rows with an empty value
+      // If "Note Admin" is in the sheet but not in the CSV, skip it in the comparison.
+      // Rows are padded with an empty value only when it sits among the CSV columns;
+      // if it comes after them, it's just an extra trailing column.
       const NOTE_ADMIN = "Note Admin";
       const noteAdminIdx = sheetHeaders.indexOf(NOTE_ADMIN);
       if (noteAdminIdx !== -1 && !csvHeaders.includes(NOTE_ADMIN)) {
         effectiveSheetHeaders = sheetHeaders.filter((_, i) => i !== noteAdminIdx);
-        rowsToSend = csv.rows.map((row) => {
-          const r = [...row];
-          r.splice(noteAdminIdx, 0, "");
-          return r;
-        });
+        if (noteAdminIdx < csvHeaders.length) {
+          rowsToSend = csv.rows.map((row) => {
+            const r = [...row];
+            r.splice(noteAdminIdx, 0, "");
+            return r;
+          });
+        }
       }
 
-      // Validate columns
-      const mismatch = csvHeaders.some((h, i) => h !== effectiveSheetHeaders[i]) ||
-                       csvHeaders.length !== effectiveSheetHeaders.length;
+      // Validate columns: CSV headers must match the first sheet headers in order.
+      // Extra sheet columns after the CSV ones are allowed (left empty on append).
+      const mismatch = csvHeaders.length > effectiveSheetHeaders.length ||
+                       csvHeaders.some((h, i) => h !== effectiveSheetHeaders[i]);
 
       if (mismatch) {
         const detail = `CSV: [${csvHeaders.join(", ")}] — Sheet: [${sheetHeaders.join(", ")}]`;
@@ -262,6 +319,11 @@ export default function InviaBpPage() {
               onChange={setSheetId}
               placeholder="es. 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
             />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <Chip onClick={() => setSheetId(DEFAULT_SHEET_ID)} selected={sheetId.trim() === DEFAULT_SHEET_ID}>
+                {DEFAULT_SHEET_ID}
+              </Chip>
+            </div>
             <p style={{ margin: 0, fontSize: 12, color: "#6b6b70" }}>
               Puoi trovarlo nell&apos;URL del foglio: docs.google.com/spreadsheets/d/<strong style={{ color: "#9b9ba0" }}>ID</strong>/edit
             </p>
@@ -274,12 +336,27 @@ export default function InviaBpPage() {
             <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "#9b9ba0" }}>4 · Nome tab</p>
             <TextInput
               value={tabName}
-              onChange={(v) => { setTabName(v); setSendStatus("idle"); setSendMsg(null); }}
+              onChange={selectTab}
               placeholder="es. Fatture 2025"
               disabled={sendStatus === "ok"}
             />
+            {tabsLoading && (
+              <p style={{ margin: 0, fontSize: 12, color: "#6b6b70" }}>Caricamento tab…</p>
+            )}
+            {currentTabs?.error && (
+              <p style={{ margin: 0, fontSize: 12, color: "#dc2626" }}>{currentTabs.error}</p>
+            )}
+            {currentTabs && currentTabs.tabs.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {currentTabs.tabs.map((t) => (
+                  <Chip key={t} onClick={() => selectTab(t)} selected={tabName === t} disabled={sendStatus === "ok"}>
+                    {t}
+                  </Chip>
+                ))}
+              </div>
+            )}
             <p style={{ margin: 0, fontSize: 12, color: "#6b6b70" }}>
-              Le colonne del CSV devono corrispondere esattamente all&apos;intestazione della tab.
+              Le colonne del CSV devono corrispondere, nello stesso ordine, alle prime colonne della tab. Eventuali colonne in più in coda alla tab restano vuote.
             </p>
             {sendStatus !== "ok" && (
               <Btn

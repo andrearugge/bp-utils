@@ -4,6 +4,19 @@ function authHeader(token: string) {
   return { Authorization: `Bearer ${token}` };
 }
 
+export async function listTabs(token: string, sheetId: string): Promise<string[]> {
+  const res = await fetch(`${BASE}/${sheetId}?fields=sheets.properties.title`, {
+    headers: authHeader(token),
+  });
+  if (res.status === 404) throw new Error("Foglio non trovato. Controlla l'ID.");
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.error?.message ?? `Errore API: ${res.status}`);
+  }
+  const data = await res.json();
+  return (data.sheets ?? []).map((s: { properties: { title: string } }) => s.properties.title);
+}
+
 export async function getTabHeaders(
   token: string,
   sheetId: string,
